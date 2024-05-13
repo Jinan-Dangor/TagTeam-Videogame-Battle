@@ -72,8 +72,12 @@ const server = createServer(async (req, res) => {
 server.listen(port, hostname, async () => {
     if (!fs.existsSync(game_name_to_ids_file)) {
         console.log(`Mapping from game names to ids absent, generating...`);
-        await store_game_name_to_ids();
-        console.log(`Generated.`);
+        const generation_success = await store_game_name_to_ids();
+        if (generation_success) {
+            console.log(`Generated.`);
+        } else {
+            return;
+        }
     }
     game_name_to_ids = new Map(
         Object.entries(
@@ -117,7 +121,9 @@ server.listen(port, hostname, async () => {
             console.log(`All games recovered.`);
         } else {
             console.log(
-                `Incomplete database recovery - missing ${num_entries_not_found} records. Rerun server to continue download.`
+                `Incomplete database recovery - missing ${num_entries_not_found} records (currently have ${
+                    Object.keys(game_database).length
+                }). Rerun server to continue download.`
             );
         }
     }
@@ -131,15 +137,24 @@ async function store_game_name_to_ids() {
         console.log("Unable to fetch -", err);
     });
     const json_response = await fetch_response.text();
+    if (!json_response) {
+        console.log(
+            "Cannot construct list of game ids due to rate limited API, try again later."
+        );
+        return false;
+    }
     const game_list = JSON.parse(json_response).applist.apps;
     for (let i = 0; i < game_list.length; i++) {
+        if (!filter_game_by_name(game_list[i].name)) {
+            continue;
+        }
         const simple_name = simplify_game_name_search_term(game_list[i].name);
         if (game_name_to_ids.get(simple_name) == undefined) {
             game_name_to_ids.set(simple_name, []);
         }
         game_name_to_ids.get(simple_name).push(game_list[i].appid);
     }
-    fs.writeFile(
+    fs.writeFileSync(
         game_name_to_ids_file,
         JSON.stringify(Object.fromEntries(game_name_to_ids)),
         (err) => {
@@ -148,6 +163,7 @@ async function store_game_name_to_ids() {
             }
         }
     );
+    return true;
 }
 
 async function store_game_database(limit = undefined) {
@@ -245,4 +261,16 @@ async function store_game_database(limit = undefined) {
 
 function simplify_game_name_search_term(game_name) {
     return game_name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function filter_game_by_name(game_name) {
+    const simplified_name = simplify_game_name_search_term(game_name);
+    const numbers_only_name = game_name.replace(/[^0-9]/g, "");
+    if (
+        simplified_name == "" ||
+        (game_name != simplified_name && simplified_name == numbers_only_name)
+    ) {
+        return false;
+    }
+    return true;
 }

@@ -26,14 +26,22 @@ const SteamUser = require("steam-user");
         review_percentage:  Number from 0 to 100 representing percentage of positive reviews (I believe)
     }
 */
+
+/*
+    Notes about testing:
+    Bioshock Remastered has multiple developers and publishers
+*/
+
 let game_database = {};
 let game_name_to_ids = new Map();
+let skipped_ids = [];
 let expected_num_of_games = 0;
 let READY_TO_RUN = false;
 
 const fs = require("node:fs");
 const path = require("path");
 const game_name_to_ids_file = path.join(__dirname, "game_name_to_ids.json");
+const skipped_ids_file = path.join(__dirname, "skipped_ids.json");
 const game_database_file = path.join(__dirname, "game_database.json");
 
 const server = createServer(async (req, res) => {
@@ -85,6 +93,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, hostname, async () => {
+    await retrieve_skipped_ids();
     await retrieve_game_name_to_ids();
     await retrieve_game_database();
 });
@@ -93,6 +102,14 @@ function server_ready() {
     console.log(`Server running at http://${hostname}:${port}/`);
     READY_TO_RUN = true;
     return;
+}
+
+async function retrieve_skipped_ids() {
+    if (fs.existsSync(skipped_ids_file)) {
+        skipped_ids = JSON.parse(
+            fs.readFileSync(skipped_ids_file, { encoding: "utf-8" })
+        );
+    }
 }
 
 async function retrieve_game_name_to_ids() {
@@ -123,10 +140,13 @@ async function retrieve_game_database() {
         game_database = JSON.parse(
             fs.readFileSync(game_database_file, { encoding: "utf-8" })
         );
-        if (Object.keys(game_database).length < expected_num_of_games) {
+        if (
+            Object.keys(game_database).length + skipped_ids.length <
+            expected_num_of_games
+        ) {
             console.log(
                 `Expected ${expected_num_of_games} games, only found ${
-                    Object.keys(game_database).length
+                    Object.keys(game_database).length + skipped_ids.length
                 } in database. Recovering missing games...`
             );
         } else {
@@ -136,7 +156,7 @@ async function retrieve_game_database() {
     } else {
         console.log(`Games database missing, generating...`);
     }
-    await store_game_database(200);
+    await store_game_database(100);
 }
 
 async function store_game_name_to_ids() {
@@ -200,7 +220,10 @@ async function store_game_database(limit = undefined) {
             for (let j = 0; j < relevant_ids.length; j++) {
                 const target_game_id = relevant_ids[j];
                 //console.log(target_game_id);
-                if (game_database[target_game_id]) {
+                if (
+                    game_database[target_game_id] ||
+                    skipped_ids.includes(target_game_id)
+                ) {
                     continue;
                 }
                 try {
@@ -214,15 +237,18 @@ async function store_game_database(limit = undefined) {
                         }
                     );
                     if (steamuser_response.unknownApps.length > 0) {
+                        skipped_ids.push(target_game_id);
                         continue;
                     }
                     const steamuser_data =
                         steamuser_response.apps[target_game_id].appinfo;
                     if (!steamuser_data?.common?.name) {
+                        skipped_ids.push(target_game_id);
                         continue;
                     }
                     if (steamuser_data.common.type != "Game") {
                         //console.log(`Not game, ${steamuser_data.common.type}`);
+                        skipped_ids.push(target_game_id);
                         continue;
                     }
                     if (
@@ -230,6 +256,7 @@ async function store_game_database(limit = undefined) {
                             undefined &&
                         steamuser_data?.common?.ReleaseState != "released"
                     ) {
+                        skipped_ids.push(target_game_id);
                         continue;
                     }
                     const name = steamuser_data.common.name;
@@ -285,6 +312,15 @@ async function store_game_database(limit = undefined) {
                                 }
                             }
                         );
+                        fs.writeFileSync(
+                            skipped_ids_file,
+                            JSON.stringify(skipped_ids),
+                            (err) => {
+                                if (err) {
+                                    console.log("Unable to write -", err);
+                                }
+                            }
+                        );
                     }
                     database[target_game_id] = database_entry;
                 } catch (err) {
@@ -308,7 +344,9 @@ async function store_game_database(limit = undefined) {
             }
         );
         const num_entries_not_found =
-            expected_num_of_games - Object.keys(game_database).length;
+            expected_num_of_games -
+            Object.keys(game_database).length -
+            skipped_ids.length;
         if (num_entries_not_found == 0) {
             console.log(`Generated.`);
         } else {

@@ -1,7 +1,16 @@
-const { createServer } = require("node:http");
+import api_key from "./steam_webapi_key.js";
+import SteamUser from "steam-user";
+import { createServer } from "node:http";
 const hostname = "127.0.0.1";
 const port = 3000;
-const SteamUser = require("steam-user");
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const game_name_to_ids_file = path.join(__dirname, "game_name_to_ids.json");
+const skipped_ids_file = path.join(__dirname, "skipped_ids.json");
+const game_database_file = path.join(__dirname, "game_database.json");
 
 /*
     Notes for node-steam-user:
@@ -17,13 +26,15 @@ const SteamUser = require("steam-user");
 /*
     Game format:
     {
-        name:               The plaintext name of the game
-        developers: []      Developer (plaintext)
-        publishers: []      Publisher (plaintext)
-        tag_ids: []         IDs of tags
-        steam_release_date: UNIX timestamp for the game's Steam release date
-        review_score:       Number from 0 to 10 representing how good a game is
-        review_percentage:  Number from 0 to 100 representing percentage of positive reviews (I believe)
+        name:                   The plaintext name of the game
+        developers: []          Developer (plaintext)
+        publishers: []          Publisher (plaintext)
+        tag_ids: []             IDs of tags
+        has_release_date:       Some games don't have a release state or date, this is true if it has either
+        steam_release_state:    State of release ('released', 'coming soon', etc)
+        steam_release_date:     UNIX timestamp for the game's Steam release date
+        review_score:           Number from 0 to 10 representing how good a game is
+        review_percentage:      Number from 0 to 100 representing percentage of positive reviews (I believe)
     }
 */
 
@@ -37,12 +48,6 @@ let game_name_to_ids = new Map();
 let skipped_ids = [];
 let expected_num_of_games = 0;
 let READY_TO_RUN = false;
-
-const fs = require("node:fs");
-const path = require("path");
-const game_name_to_ids_file = path.join(__dirname, "game_name_to_ids.json");
-const skipped_ids_file = path.join(__dirname, "skipped_ids.json");
-const game_database_file = path.join(__dirname, "game_database.json");
 
 const server = createServer(async (req, res) => {
     const url_query_parameters = req.url;
@@ -156,32 +161,64 @@ async function retrieve_game_database() {
     } else {
         console.log(`Games database missing, generating...`);
     }
-    await store_game_database(100);
+    await store_game_database(1000);
 }
 
 async function store_game_name_to_ids() {
-    const fetch_response = await fetch(
-        "https://api.steampowered.com/ISteamApps/GetAppList/v0002/?key=STEAMKEY&format=json"
-    ).catch(function (err) {
-        console.log("Unable to fetch -", err);
-    });
-    const json_response = await fetch_response.text();
-    if (!json_response) {
-        console.log(
-            "Cannot construct list of game ids due to rate limited API, try again later."
-        );
-        return false;
+    let steam_webapi_data = {};
+
+    {
+        const fetch_response = await fetch(
+            `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${api_key}&have_description_language=english&max_results=50000`
+        ).catch(function (err) {
+            console.log("Unable to fetch -", err);
+        });
+
+        const json_response = await fetch_response.text();
+        if (!json_response) {
+            console.log(
+                "Cannot construct list of game ids due to rate limited API, try again later."
+            );
+            return false;
+        }
+
+        steam_webapi_data = JSON.parse(json_response).response;
     }
-    const game_list = JSON.parse(json_response).applist.apps;
-    for (let i = 0; i < game_list.length; i++) {
-        if (!filter_game_by_name(game_list[i].name)) {
+
+    let games_list = steam_webapi_data.apps;
+    let more_games = steam_webapi_data.have_more_results;
+    while (more_games) {
+        console.log(`${games_list.length} games found`);
+        const last_appid = steam_webapi_data.last_appid;
+        const fetch_response = await fetch(
+            `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${api_key}&have_description_language=english&last_appid=${last_appid}&max_results=50000`
+        ).catch(function (err) {
+            console.log("Unable to fetch -", err);
+        });
+
+        const json_response = await fetch_response.text();
+        if (!json_response) {
+            console.log(
+                "Cannot construct list of game ids due to rate limited API, try again later."
+            );
+            return false;
+        }
+
+        steam_webapi_data = JSON.parse(json_response).response;
+        games_list = games_list.concat(steam_webapi_data.apps);
+        more_games = steam_webapi_data.have_more_results;
+    }
+    console.log(`${games_list.length} games found`);
+
+    for (let i = 0; i < games_list.length; i++) {
+        if (!filter_game_by_name(games_list[i].name)) {
             continue;
         }
-        const simple_name = simplify_game_name_search_term(game_list[i].name);
+        const simple_name = simplify_game_name_search_term(games_list[i].name);
         if (game_name_to_ids.get(simple_name) == undefined) {
             game_name_to_ids.set(simple_name, []);
         }
-        game_name_to_ids.get(simple_name).push(game_list[i].appid);
+        game_name_to_ids.get(simple_name).push(games_list[i].appid);
     }
     fs.writeFileSync(
         game_name_to_ids_file,
@@ -246,11 +283,6 @@ async function store_game_database(limit = undefined) {
                         skipped_ids.push(target_game_id);
                         continue;
                     }
-                    if (steamuser_data.common.type != "Game") {
-                        //console.log(`Not game, ${steamuser_data.common.type}`);
-                        skipped_ids.push(target_game_id);
-                        continue;
-                    }
                     if (
                         steamuser_data?.common?.steam_release_date ==
                             undefined &&
@@ -284,8 +316,14 @@ async function store_game_database(limit = undefined) {
                     const tag_ids = steamuser_data.common.store_tags
                         ? Object.values(steamuser_data.common.store_tags)
                         : [];
+                    const has_release_date =
+                        steamuser_data?.common?.steam_release_date !=
+                            undefined ||
+                        steamuser_data?.common?.ReleaseState != undefined;
+                    const steam_release_state =
+                        steamuser_data?.common?.ReleaseState;
                     const steam_release_date =
-                        steamuser_data.common.steam_release_date;
+                        steamuser_data?.common?.steam_release_date;
                     const review_score =
                         steamuser_data.common.review_score ?? 0;
                     const review_percentage =
@@ -295,6 +333,8 @@ async function store_game_database(limit = undefined) {
                         developers,
                         publishers,
                         tag_ids,
+                        has_release_date,
+                        steam_release_state,
                         steam_release_date,
                         review_score,
                         review_percentage,
@@ -353,7 +393,6 @@ async function store_game_database(limit = undefined) {
             console.log(
                 `Incomplete database recovery - missing ${num_entries_not_found} records. Rerun server to continue download.`
             );
-            already_broken_early = true;
         }
         const end_time = Date.now();
         const elapsed_time = new Date(end_time - start_time);

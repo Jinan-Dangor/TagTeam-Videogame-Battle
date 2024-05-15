@@ -161,7 +161,7 @@ async function retrieve_game_database() {
     } else {
         console.log(`Games database missing, generating...`);
     }
-    await store_game_database(1000);
+    await store_game_database();
 }
 
 async function store_game_name_to_ids() {
@@ -246,6 +246,9 @@ async function store_game_database(limit = undefined) {
     client.logOn({ anonymous: true });
     client.on("loggedOn", async () => {
         console.log("Successfully logged on to Steam interface.");
+        console.log(
+            `Every ${notification_period_in_games} games, you will be notified of progress and progress will be saved.`
+        );
         let games_added = 0;
         const start_time = Date.now();
         keyLoop: for (
@@ -280,14 +283,6 @@ async function store_game_database(limit = undefined) {
                     const steamuser_data =
                         steamuser_response.apps[target_game_id].appinfo;
                     if (!steamuser_data?.common?.name) {
-                        skipped_ids.push(target_game_id);
-                        continue;
-                    }
-                    if (
-                        steamuser_data?.common?.steam_release_date ==
-                            undefined &&
-                        steamuser_data?.common?.ReleaseState != "released"
-                    ) {
                         skipped_ids.push(target_game_id);
                         continue;
                     }
@@ -391,7 +386,9 @@ async function store_game_database(limit = undefined) {
             console.log(`Generated.`);
         } else {
             console.log(
-                `Incomplete database recovery - missing ${num_entries_not_found} records. Rerun server to continue download.`
+                `Incomplete database recovery - missing ${num_entries_not_found} records (have ${
+                    Object.keys(game_database).length + skipped_ids.length
+                }). Rerun server to continue download.`
             );
         }
         const end_time = Date.now();

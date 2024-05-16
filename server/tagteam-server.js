@@ -16,11 +16,6 @@ const game_database_file = path.join(__dirname, "game_database.json");
     Notes for node-steam-user:
         getProductInfo seem to be a good choice to get data, hope it works without needing to own the game
         getStoreTagNames gets the english names of tags, could be useful and eliminate scraping needs
-
-        The header image is stored at a url with a consistent format, so you can get it from there
-        Other stuff might just not be attainable, but everything essential seems available
-        If needed, you can gradually acquire the 'cool' info for the most popular games as they're chosen
-        Note that app_info_print (the steam command line argument effectively being used) sometimes has to run a 'request' before getting the data successfully
 */
 
 /*
@@ -36,6 +31,9 @@ const game_database_file = path.join(__dirname, "game_database.json");
         review_score:           Number from 0 to 10 representing how good a game is
         review_percentage:      Number from 0 to 100 representing percentage of positive reviews (I believe)
     }
+
+    Derivable information:
+        header_image_url:       https://cdn.akamai.steamstatic.com/steam/apps/${id}/header.jpg
 */
 
 /*

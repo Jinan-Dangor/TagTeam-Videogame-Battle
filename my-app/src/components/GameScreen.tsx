@@ -75,7 +75,7 @@ const GameScreen = () => {
                     onChange={(e) => setNameSearchTerm(e.target.value)}
                 />
                 <button type="button" onClick={get_game_id}>
-                    Fill ID by Name
+                    Search by Name
                 </button>
             </div>
             <div>

@@ -61,11 +61,12 @@ const server = createServer(async (req, res) => {
     });
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/plain");
-    let response = "";
+    let response = "[";
     for (let i = 0; i < query_objects.length; i++) {
         if (!READY_TO_RUN) {
             response += `{"success": false, "error": "Server not yet ready to recieve requests."}`;
-            break;
+            response += ",";
+            continue;
         }
         if (query_objects[i].type == "game_info") {
             const target_game_id = query_objects[i].body;
@@ -84,8 +85,9 @@ const server = createServer(async (req, res) => {
         } else {
             response += `{"success": false, "error": "Query type '${query_objects[i].type}' not recognised."}`;
         }
-        response += "\n";
+        response += ",";
     }
+    response += "]";
     res.end(response);
 });
 

@@ -64,31 +64,25 @@ const server = createServer(async (req, res) => {
     let response = "";
     for (let i = 0; i < query_objects.length; i++) {
         if (!READY_TO_RUN) {
-            response += "Server not yet ready to recieve requests.";
+            response += `{"success": false, "error": "Server not yet ready to recieve requests."}`;
             break;
         }
         if (query_objects[i].type == "game_info") {
             const target_game_id = query_objects[i].body;
             const game = game_database[target_game_id];
-            response += `You requested the info of the game ${game.name} (${
-                game.year
-            }) $${game.price / 100}. Developed by ${
-                game.developers
-            } and published by ${
-                game.publishers
-            }. Contains the tags ${Object.keys(game.tag_names)}.`;
+            response += JSON.stringify({ success: true, ...game });
         } else if (query_objects[i].type == "game_name_search") {
             const game_name = decodeURIComponent(query_objects[i].body);
             const game_search_name = simplify_game_name_search_term(game_name);
             if (game_name_to_ids.get(game_search_name)) {
-                response +=
-                    "The id of your game is: " +
-                    game_name_to_ids.get(game_search_name);
+                response += `{"success": true, "ids":[${game_name_to_ids.get(
+                    game_search_name
+                )}]}`;
             } else {
-                response += "No game found under name: " + game_name;
+                response += `{"success": true, "ids":[]}`;
             }
         } else {
-            response += "Unrecognised query type " + query_objects[i].type;
+            response += `{"success": false, "error": "Query type '${query_objects[i].type}' not recognised."}`;
         }
         response += "\n";
     }

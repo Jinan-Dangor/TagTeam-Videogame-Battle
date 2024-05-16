@@ -2,7 +2,7 @@ import api_key from "./steam_webapi_key.js";
 import SteamUser from "steam-user";
 import { createServer } from "node:http";
 const hostname = "127.0.0.1";
-const port = 3000;
+const port = 3001;
 
 import fs from "node:fs";
 import path from "node:path";
@@ -61,34 +61,45 @@ const server = createServer(async (req, res) => {
     });
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/plain");
-    let response = "[";
+    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+    res.setHeader("Access-Control-Allow-Methods", "GET");
+    res.setHeader(
+        "Access-Control-Allow-Headers",
+        "X-Requested-With,content-type"
+    );
+    res.setHeader("Access-Control-Allow-Credentials", true);
+    let response = { responses: [] };
     for (let i = 0; i < query_objects.length; i++) {
         if (!READY_TO_RUN) {
-            response += `{"success": false, "error": "Server not yet ready to recieve requests."}`;
-            response += ",";
+            response.responses.push({
+                success: false,
+                error: "Server not yet ready to recieve requests.",
+            });
             continue;
         }
         if (query_objects[i].type == "game_info") {
             const target_game_id = query_objects[i].body;
             const game = game_database[target_game_id];
-            response += JSON.stringify({ success: true, ...game });
+            response.responses.push({ success: true, ...game });
         } else if (query_objects[i].type == "game_name_search") {
             const game_name = decodeURIComponent(query_objects[i].body);
             const game_search_name = simplify_game_name_search_term(game_name);
             if (game_name_to_ids.get(game_search_name)) {
-                response += `{"success": true, "ids":[${game_name_to_ids.get(
-                    game_search_name
-                )}]}`;
+                response.responses.push({
+                    success: true,
+                    ids: game_name_to_ids.get(game_search_name),
+                });
             } else {
-                response += `{"success": true, "ids":[]}`;
+                response.responses.push({ success: true, ids: [] });
             }
         } else {
-            response += `{"success": false, "error": "Query type '${query_objects[i].type}' not recognised."}`;
+            response.responses.push({
+                success: false,
+                error: `Query type '${query_objects[i].type}' not recognised.`,
+            });
         }
-        response += ",";
     }
-    response += "]";
-    res.end(response);
+    res.end(JSON.stringify(response));
 });
 
 server.listen(port, hostname, async () => {

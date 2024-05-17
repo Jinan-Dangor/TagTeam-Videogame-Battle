@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import tags from "../scripts/scrapedTags.json";
+import AutocompleteInput from "./AutocompleteInput";
 
 type GameData = {
     name: string;
@@ -18,9 +19,30 @@ type TagData = {
     emoji: string;
 };
 
+type AutocompleteData = {
+    id: string;
+    name: string;
+    year_text: string;
+    review_percentage: number;
+};
+
 function unescapeChars(str: string) {
     return new DOMParser().parseFromString(str, "text/html").documentElement
         .textContent;
+}
+
+function getReleaseYearString(game: GameData) {
+    if (!game.has_release_date) {
+        return "";
+    }
+    if (game.steam_release_date == 0) {
+        return "Coming Soon";
+    }
+    return `${getYear(game.steam_release_date)}`;
+}
+
+function getYear(unix: number) {
+    return new Date(unix * 1000).getFullYear();
 }
 
 const GameScreen = () => {
@@ -28,13 +50,30 @@ const GameScreen = () => {
     const [currentGameId, setCurrentGameId] = useState<string>("");
     const [nameSearchTerm, setNameSearchTerm] = useState<string>("");
     const [gameData, setGameData] = useState<GameData | null>(null);
+    const [suggestions, setSuggestions] = useState<AutocompleteData[]>([]);
     let tag_data: { [id: string]: TagData } = {};
     tags.forEach(
         (tag) => (tag_data[tag.ID] = { name: tag.name, emoji: tag.emoji })
     );
 
     useEffect(() => {
-        if (currentGameId) {
+        if (nameSearchTerm == "") {
+            return;
+        }
+        fetch(
+            `http://127.0.0.1:3001/?autocomplete_games=${nameSearchTerm}`
+        ).then(async (response) => {
+            const response_json = await response.json();
+            if (response_json.responses[0].success) {
+                const autocomplete_data = response_json.responses[0];
+                setSuggestions(autocomplete_data.valid_games);
+                console.log(autocomplete_data.valid_games);
+            }
+        });
+    }, [nameSearchTerm]);
+
+    useEffect(() => {
+        if (currentGameId != "") {
             search_for_game();
         }
     }, [currentGameId]);
@@ -45,36 +84,46 @@ const GameScreen = () => {
                 const response_json = await response.json();
                 if (response_json.responses[0].success) {
                     const game_data = response_json.responses[0];
-                    console.log(game_data);
                     setGameData(game_data);
                 }
             }
         );
     };
 
-    const get_game_id = () => {
-        fetch(
-            `http://127.0.0.1:3001/?game_name_search=${encodeURIComponent(
-                nameSearchTerm
-            )}`
-        ).then(async (response) => {
-            const response_json = await response.json();
-            if (response_json.responses[0].success) {
-                const id_data = response_json.responses[0];
-                setIdSearchTerm(id_data.ids[0]);
-                setCurrentGameId(id_data.ids[0]);
-            }
-        });
-    };
-
     return (
         <div className="App">
             <div>
-                <input
-                    id="game_id_input"
+                <AutocompleteInput
+                    value={nameSearchTerm}
+                    setValue={(value) => {
+                        setIdSearchTerm(value);
+                        setCurrentGameId(value);
+                    }}
+                    suggestions={suggestions.map((suggestion) => {
+                        return {
+                            label: `${suggestion.name} ${
+                                suggestion.year_text != ""
+                                    ? `(${suggestion.year_text})`
+                                    : ""
+                            }`,
+                            search_term: suggestion.name,
+                            value: suggestion.id,
+                        };
+                    })}
                     onChange={(e) => setNameSearchTerm(e.target.value)}
+                    onSelectSuggestion={(value) => {
+                        setNameSearchTerm(value);
+                    }}
                 />
-                <button type="button" onClick={get_game_id}>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setNameSearchTerm(suggestions[0].name);
+                        setIdSearchTerm(suggestions[0].id);
+                        setCurrentGameId(suggestions[0].id);
+                        search_for_game();
+                    }}
+                >
                     Search by Name
                 </button>
             </div>
@@ -111,12 +160,7 @@ const GameScreen = () => {
                                     You chose the game {gameData.name}{" "}
                                     {gameData.has_release_date && (
                                         <span>
-                                            {gameData.steam_release_date != 0
-                                                ? `(${new Date(
-                                                      gameData.steam_release_date *
-                                                          1000
-                                                  ).getFullYear()})`
-                                                : "(Coming Soon)"}
+                                            {getReleaseYearString(gameData)}
                                         </span>
                                     )}
                                 </p>

@@ -81,17 +81,49 @@ const server = createServer(async (req, res) => {
             const target_game_id = query_objects[i].body;
             const game = game_database[target_game_id];
             response.responses.push({ success: true, ...game });
-        } else if (query_objects[i].type == "game_name_search") {
-            const game_name = decodeURIComponent(query_objects[i].body);
-            const game_search_name = simplify_game_name_search_term(game_name);
-            if (game_name_to_ids.get(game_search_name)) {
-                response.responses.push({
-                    success: true,
-                    ids: game_name_to_ids.get(game_search_name),
-                });
-            } else {
-                response.responses.push({ success: true, ids: [] });
-            }
+        } else if (query_objects[i].type == "autocomplete_games") {
+            const search_term = simplify_game_name_search_term(
+                decodeURIComponent(query_objects[i].body)
+            );
+            const valid_games = Object.keys(game_database)
+                .filter((id) =>
+                    simplify_game_name_search_term(
+                        game_database[id].name
+                    ).includes(search_term)
+                )
+                .map((id) => {
+                    return {
+                        id,
+                        name: game_database[id].name,
+                        year_text: getReleaseYearString(game_database[id]),
+                        review_percentage: Number(
+                            game_database[id].review_percentage
+                        ),
+                        review_score: Number(game_database[id].review_score),
+                    };
+                })
+                .sort((a, b) => {
+                    const score_a = a.review_percentage + 10 * a.review_score;
+                    const starting_mod_a = simplify_game_name_search_term(
+                        a.name
+                    ).startsWith(search_term)
+                        ? 1000
+                        : 0;
+                    const score_b = b.review_percentage + 10 * b.review_score;
+                    const starting_mod_b = simplify_game_name_search_term(
+                        b.name
+                    ).startsWith(search_term)
+                        ? 1000
+                        : 0;
+                    const final_score_a = score_a + starting_mod_a;
+                    const final_score_b = score_b + starting_mod_b;
+                    return final_score_b - final_score_a;
+                })
+                .slice(0, 10);
+            response.responses.push({
+                success: true,
+                valid_games,
+            });
         } else {
             response.responses.push({
                 success: false,
@@ -419,4 +451,18 @@ function filter_game_by_name(game_name) {
         return false;
     }
     return true;
+}
+
+function getReleaseYearString(game) {
+    if (!game.has_release_date) {
+        return "";
+    }
+    if (game.steam_release_date == 0) {
+        return "Coming Soon";
+    }
+    return `${getYear(game.steam_release_date)}`;
+}
+
+function getYear(unix) {
+    return new Date(unix * 1000).getFullYear();
 }

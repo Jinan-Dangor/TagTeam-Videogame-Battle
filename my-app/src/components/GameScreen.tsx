@@ -62,7 +62,7 @@ function getYear(unix: number) {
 const TOP_TAG_LIMIT = 5;
 
 const GameScreen = () => {
-    const [usedGameIds, setUsedGameIds] = useState<string[]>(["683320"]);
+    const [usedGameIds, setUsedGameIds] = useState<string[]>(["440"]);
     const [tagUsedCount, setTagUsedCount] = useState<{
         [id: string]: number;
     }>({});
@@ -71,7 +71,7 @@ const GameScreen = () => {
     }>({});
     const [errorText, setErrorText] = useState<string>("");
     const [lastGameId, setLastGameId] = useState<string>("");
-    const [currentGameId, setCurrentGameId] = useState<string>("683320");
+    const [currentGameId, setCurrentGameId] = useState<string>("440");
     const [newGameId, setNewGameId] = useState<string>("");
     const [nameSearchTerm, setNameSearchTerm] = useState<string>("");
     const [lastGameData, setLastGameData] = useState<GameData | null>(null);
@@ -315,7 +315,12 @@ const GameScreen = () => {
                             {matchType.tag_ids?.map((tag_id) => (
                                 <p key={tag_id}>
                                     {unescapeChars(tag_data[tag_id].name)}{" "}
-                                    {tag_data[tag_id].emoji}
+                                    {tag_data[tag_id].emoji}{" "}
+                                    {[1, 2, 3].map((num) =>
+                                        tagUsedCount[tag_id] >= num
+                                            ? String.fromCodePoint(0x2611)
+                                            : String.fromCodePoint(0x2610)
+                                    )}
                                 </p>
                             ))}
                         </>
@@ -344,7 +349,17 @@ const GameScreen = () => {
                                                 {creator_role_a} of{" "}
                                                 {lastGameData?.name} and{" "}
                                                 {creator_role_b} of{" "}
-                                                {currentGameData?.name}
+                                                {currentGameData?.name}{" "}
+                                                {[1, 2, 3].map((num) =>
+                                                    creatorUsedCount[creator] >=
+                                                    num
+                                                        ? String.fromCodePoint(
+                                                              0x2611
+                                                          )
+                                                        : String.fromCodePoint(
+                                                              0x2610
+                                                          )
+                                                )}
                                             </p>
                                         );
                                     })}

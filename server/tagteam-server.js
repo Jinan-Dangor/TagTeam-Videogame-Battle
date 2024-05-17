@@ -103,20 +103,28 @@ const server = createServer(async (req, res) => {
                     };
                 })
                 .sort((a, b) => {
-                    const score_a = a.review_percentage + 10 * a.review_score;
-                    const starting_mod_a = simplify_game_name_search_term(
+                    const simple_name_a = simplify_game_name_search_term(
                         a.name
-                    ).startsWith(search_term)
-                        ? 1000
-                        : 0;
-                    const score_b = b.review_percentage + 10 * b.review_score;
-                    const starting_mod_b = simplify_game_name_search_term(
+                    );
+                    const simple_name_b = simplify_game_name_search_term(
                         b.name
-                    ).startsWith(search_term)
+                    );
+                    const score_a = a.review_percentage + 10 * a.review_score;
+                    const starting_mod_a = simple_name_a.startsWith(search_term)
                         ? 1000
                         : 0;
-                    const final_score_a = score_a + starting_mod_a;
-                    const final_score_b = score_b + starting_mod_b;
+                    const perfect_mod_a =
+                        simple_name_a == search_term ? 10000 : 0;
+                    const score_b = b.review_percentage + 10 * b.review_score;
+                    const starting_mod_b = simple_name_b.startsWith(search_term)
+                        ? 1000
+                        : 0;
+                    const perfect_mod_b =
+                        simple_name_b == search_term ? 10000 : 0;
+                    const final_score_a =
+                        score_a + starting_mod_a + perfect_mod_a;
+                    const final_score_b =
+                        score_b + starting_mod_b + perfect_mod_b;
                     return final_score_b - final_score_a;
                 })
                 .slice(0, 10);

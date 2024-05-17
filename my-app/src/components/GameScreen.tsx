@@ -46,7 +46,7 @@ function getYear(unix: number) {
 }
 
 const GameScreen = () => {
-    const [idSearchTerm, setIdSearchTerm] = useState<string>("");
+    const [lastGameId, setLastGameId] = useState<string>("440");
     const [currentGameId, setCurrentGameId] = useState<string>("");
     const [nameSearchTerm, setNameSearchTerm] = useState<string>("");
     const [gameData, setGameData] = useState<GameData | null>(null);
@@ -92,11 +92,11 @@ const GameScreen = () => {
 
     return (
         <div className="App">
+            <h1>Singleplayer Battle Test</h1>
             <div>
                 <AutocompleteInput
                     value={nameSearchTerm}
                     setValue={(value) => {
-                        setIdSearchTerm(value);
                         setCurrentGameId(value);
                     }}
                     suggestions={suggestions.map((suggestion) => {
@@ -119,25 +119,11 @@ const GameScreen = () => {
                     type="button"
                     onClick={() => {
                         setNameSearchTerm(suggestions[0].name);
-                        setIdSearchTerm(suggestions[0].id);
                         setCurrentGameId(suggestions[0].id);
                         search_for_game();
                     }}
                 >
                     Search by Name
-                </button>
-            </div>
-            <div>
-                <input
-                    id="game_id_input"
-                    onChange={(e) => setIdSearchTerm(e.target.value)}
-                    value={idSearchTerm}
-                />
-                <button
-                    type="button"
-                    onClick={() => setCurrentGameId(idSearchTerm)}
-                >
-                    Search by ID
                 </button>
             </div>
             {gameData && (

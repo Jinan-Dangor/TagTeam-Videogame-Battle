@@ -211,11 +211,13 @@ const GameScreen = () => {
             .filter((tag) =>
                 game_b.tag_ids.slice(0, TOP_TAG_LIMIT).includes(tag)
             );
-        const shared_creators = game_a.developers
-            .concat(game_a.publishers)
-            .filter((creator) =>
-                game_b.developers.concat(game_b.publishers).includes(creator)
-            );
+        const shared_creators = [
+            ...new Set([...game_a.developers, ...game_a.publishers]),
+        ].filter((creator) =>
+            [...new Set([...game_b.developers, ...game_b.publishers])].includes(
+                creator
+            )
+        );
         if (shared_creators.length > 0) {
             const creator_roles = shared_creators.map((creator) => {
                 const developed_a = game_a.developers.includes(creator);

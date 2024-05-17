@@ -113,6 +113,7 @@ const GameScreen = () => {
     }, [nameSearchTerm]);
 
     useEffect(() => {
+        setErrorText(``);
         if (newGameId != "") {
             search_for_game(newGameId);
         }

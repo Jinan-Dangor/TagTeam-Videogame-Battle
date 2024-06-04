@@ -6,16 +6,16 @@ Documentation is still being worked on, but in the meantime here's where you can
 <br>
 **Scraped List of Tags**
 <br>
-my-app/src/scripts/scrapedTags.json
+`my-app/src/scripts/scrapedTags.json`
 <br>
 **Game IDs, by Simplified Name of App**
 <br>
-server/game_name_to_ids.json
+`server/game_name_to_ids.json`
 <br>
 **App IDs that Experienced Errors During Retrieval**
 <br>
-server/skipped_ids.json
+`server/skipped_ids.json`
 <br>
 **Database of Games**
 <br>
-server/game_database.json
+`server/game_database.json`

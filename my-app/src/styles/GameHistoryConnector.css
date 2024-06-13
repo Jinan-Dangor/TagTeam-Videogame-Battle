@@ -1,0 +1,16 @@
+.game-history-connector {
+    width: 5px;
+    height: 50px;
+    background-color: darkgreen;
+    margin: auto;
+    animation: 0.5s ease-out 0s 1 expand;
+}
+
+@keyframes expand {
+    0% {
+        height: 0px;
+    }
+    100% {
+        height: 50px;
+    }
+}

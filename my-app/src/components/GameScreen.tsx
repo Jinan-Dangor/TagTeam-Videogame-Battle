@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
 import tags from "../scripts/scrapedTags.json";
 import AutocompleteInput from "./AutocompleteInput";
+import GameHistoryItem from "./GameHistoryItem";
+import GameHistoryConnector from "./GameHistoryConnector";
+import GameHistoryLink from "./GameHistoryLink";
 
-type GameData = {
+export type GameData = {
     name: string;
     developers: string[];
     publishers: string[];
@@ -40,22 +43,31 @@ type MatchData = {
     creator_roles_b?: string[];
 };
 
+type GameHistoryEntry = {
+    id: string;
+    data: GameData;
+};
+
+type GameLinkHistoryEntry = {
+    match: MatchData;
+    counts: number[];
+};
+
 function unescapeChars(str: string) {
-    return new DOMParser().parseFromString(str, "text/html").documentElement
-        .textContent;
+    return new DOMParser().parseFromString(str, "text/html").documentElement.textContent;
 }
 
-function getReleaseYearString(game: GameData) {
+export function getReleaseYearString(game: GameData) {
     if (!game.has_release_date) {
         return "";
     }
     if (game.steam_release_date == 0) {
-        return "Coming Soon";
+        return "(Coming Soon)";
     }
-    return `${getYear(game.steam_release_date)}`;
+    return `(${getYear(game.steam_release_date)})`;
 }
 
-function getYear(unix: number) {
+export function getYear(unix: number) {
     return new Date(unix * 1000).getFullYear();
 }
 
@@ -70,40 +82,33 @@ const GameScreen = () => {
         [creator: string]: number;
     }>({});
     const [errorText, setErrorText] = useState<string>("");
-    const [lastGameId, setLastGameId] = useState<string>("");
-    const [currentGameId, setCurrentGameId] = useState<string>("440");
     const [newGameId, setNewGameId] = useState<string>("");
     const [nameSearchTerm, setNameSearchTerm] = useState<string>("");
-    const [lastGameData, setLastGameData] = useState<GameData | null>(null);
-    const [currentGameData, setCurrentGameData] = useState<GameData | null>(
-        null
-    );
+    const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
+    const [gameLinkHistory, setGameLinkHistory] = useState<GameLinkHistoryEntry[]>([]);
     const [suggestions, setSuggestions] = useState<AutocompleteData[]>([]);
-    const [matchType, setMatchType] = useState<MatchData | null>(null);
     let tag_data: { [id: string]: TagData } = {};
-    tags.forEach(
-        (tag) => (tag_data[tag.ID] = { name: tag.name, emoji: tag.emoji })
-    );
+    tags.forEach((tag) => (tag_data[tag.ID] = { name: tag.name, emoji: tag.emoji }));
 
     useEffect(() => {
-        fetch(`http://127.0.0.1:3001/?game_info=${currentGameId}`).then(
-            async (response) => {
-                const response_json = await response.json();
-                if (response_json.responses[0].success) {
-                    const first_game_data = response_json.responses[0];
-                    setCurrentGameData(first_game_data);
-                }
+        const firstGameId = "440";
+        if (gameHistory.length > 0) {
+            return;
+        }
+        fetch(`http://127.0.0.1:3001/?game_info=${firstGameId}`).then(async (response) => {
+            const response_json = await response.json();
+            if (response_json.responses[0].success) {
+                const first_game_data = response_json.responses[0];
+                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), { id: firstGameId, data: first_game_data }]);
             }
-        );
+        });
     }, []);
 
     useEffect(() => {
         if (nameSearchTerm == "") {
             return;
         }
-        fetch(
-            `http://127.0.0.1:3001/?autocomplete_games=${nameSearchTerm}`
-        ).then(async (response) => {
+        fetch(`http://127.0.0.1:3001/?autocomplete_games=${nameSearchTerm}`).then(async (response) => {
             const response_json = await response.json();
             if (response_json.responses[0].success) {
                 const autocomplete_data = response_json.responses[0];
@@ -120,104 +125,70 @@ const GameScreen = () => {
     }, [newGameId]);
 
     const search_for_game = (id: string) => {
-        fetch(`http://127.0.0.1:3001/?game_info=${id}`).then(
-            async (response) => {
-                const response_json = await response.json();
-                if (response_json.responses[0].success) {
-                    const new_game_data = response_json.responses[0];
-                    if (usedGameIds.includes(newGameId)) {
-                        setErrorText(
-                            `${new_game_data.name} has already been played.`
-                        );
-                        return;
-                    }
-                    if (currentGameData) {
-                        const match_result = compare_games(
-                            currentGameData,
-                            new_game_data
-                        );
-                        if (match_result.type == MatchType.Tags) {
-                            let new_dict: { [id: string]: number } = {};
-                            for (
-                                let i = 0;
-                                i < (match_result.tag_ids?.length ?? 0);
-                                i++
-                            ) {
-                                const new_tag_id =
-                                    match_result.tag_ids?.[i] ?? 0;
-                                if (tagUsedCount[new_tag_id] >= 3) {
-                                    setErrorText(
-                                        `${tag_data[new_tag_id].name} has already been played 3 times.`
-                                    );
-                                    return;
-                                }
-                                if (new_tag_id in tagUsedCount) {
-                                    new_dict[new_tag_id] =
-                                        tagUsedCount[new_tag_id] + 1;
-                                } else {
-                                    new_dict[new_tag_id] = 1;
-                                }
+        fetch(`http://127.0.0.1:3001/?game_info=${id}`).then(async (response) => {
+            const response_json = await response.json();
+            if (response_json.responses[0].success) {
+                const new_game_data = response_json.responses[0];
+                if (usedGameIds.includes(newGameId)) {
+                    setErrorText(`${new_game_data.name} has already been played.`);
+                    return;
+                }
+                if (gameHistory[gameHistory.length - 1].data) {
+                    const match_result = compare_games(gameHistory[gameHistory.length - 1].data, new_game_data);
+                    let new_counts: number[] = [];
+                    if (match_result.type == MatchType.Tags) {
+                        let new_dict: { [id: string]: number } = {};
+                        for (let i = 0; i < (match_result.tag_ids?.length ?? 0); i++) {
+                            const new_tag_id = match_result.tag_ids?.[i] ?? 0;
+                            if (tagUsedCount[new_tag_id] >= 3) {
+                                setErrorText(`${tag_data[new_tag_id].name} has already been played 3 times.`);
+                                return;
                             }
-                            setTagUsedCount({ ...tagUsedCount, ...new_dict });
-                        }
-                        if (match_result.type == MatchType.Creators) {
-                            let new_dict: { [creator: string]: number } = {};
-                            for (
-                                let i = 0;
-                                i < (match_result.creators?.length ?? 0);
-                                i++
-                            ) {
-                                const new_creator_name =
-                                    match_result.creators?.[i] ?? 0;
-                                if (creatorUsedCount[new_creator_name] >= 3) {
-                                    setErrorText(
-                                        `${new_creator_name} has already been played 3 times.`
-                                    );
-                                    return;
-                                }
-                                if (new_creator_name in creatorUsedCount) {
-                                    new_dict[new_creator_name] =
-                                        creatorUsedCount[new_creator_name] + 1;
-                                } else {
-                                    new_dict[new_creator_name] = 1;
-                                }
+                            if (new_tag_id in tagUsedCount) {
+                                new_dict[new_tag_id] = tagUsedCount[new_tag_id] + 1;
+                                new_counts.push(tagUsedCount[new_tag_id] + 1);
+                            } else {
+                                new_dict[new_tag_id] = 1;
+                                new_counts.push(1);
                             }
-                            setCreatorUsedCount({
-                                ...creatorUsedCount,
-                                ...new_dict,
-                            });
                         }
-                        if (match_result.type != MatchType.None) {
-                            setLastGameId(currentGameId);
-                            setCurrentGameId(newGameId);
-                            setLastGameData(currentGameData);
-                            setCurrentGameData(new_game_data);
-                            setMatchType(match_result);
-                            setNewGameId("");
-                            setUsedGameIds([...usedGameIds, newGameId]);
-                        } else {
-                            setMatchType(match_result);
-                            setNewGameId("");
-                        }
+                        setTagUsedCount({ ...tagUsedCount, ...new_dict });
                     }
+                    if (match_result.type == MatchType.Creators) {
+                        let new_dict: { [creator: string]: number } = {};
+                        for (let i = 0; i < (match_result.creators?.length ?? 0); i++) {
+                            const new_creator_name = match_result.creators?.[i] ?? 0;
+                            if (creatorUsedCount[new_creator_name] >= 3) {
+                                setErrorText(`${new_creator_name} has already been played 3 times.`);
+                                return;
+                            }
+                            if (new_creator_name in creatorUsedCount) {
+                                new_dict[new_creator_name] = creatorUsedCount[new_creator_name] + 1;
+                                new_counts.push(creatorUsedCount[new_creator_name] + 1);
+                            } else {
+                                new_dict[new_creator_name] = 1;
+                                new_counts.push(1);
+                            }
+                        }
+                        setCreatorUsedCount({
+                            ...creatorUsedCount,
+                            ...new_dict,
+                        });
+                    }
+                    if (match_result.type != MatchType.None) {
+                        setGameHistory([...gameHistory, { id: newGameId, data: new_game_data }]);
+                        setUsedGameIds([...usedGameIds, newGameId]);
+                        setGameLinkHistory([...gameLinkHistory, { match: match_result, counts: new_counts }]);
+                    }
+                    setNewGameId("");
                 }
             }
-        );
+        });
     };
 
     const compare_games = (game_a: GameData, game_b: GameData): MatchData => {
-        const shared_tags = game_a.tag_ids
-            .slice(0, TOP_TAG_LIMIT)
-            .filter((tag) =>
-                game_b.tag_ids.slice(0, TOP_TAG_LIMIT).includes(tag)
-            );
-        const shared_creators = [
-            ...new Set([...game_a.developers, ...game_a.publishers]),
-        ].filter((creator) =>
-            [...new Set([...game_b.developers, ...game_b.publishers])].includes(
-                creator
-            )
-        );
+        const shared_tags = game_a.tag_ids.slice(0, TOP_TAG_LIMIT).filter((tag) => game_b.tag_ids.slice(0, TOP_TAG_LIMIT).includes(tag));
+        const shared_creators = [...new Set([...game_a.developers, ...game_a.publishers])].filter((creator) => [...new Set([...game_b.developers, ...game_b.publishers])].includes(creator));
         if (shared_creators.length > 0) {
             const creator_roles = shared_creators.map((creator) => {
                 const developed_a = game_a.developers.includes(creator);
@@ -253,12 +224,8 @@ const GameScreen = () => {
             return {
                 type: MatchType.Creators,
                 creators: creator_roles.map((creator) => creator.creator),
-                creator_roles_a: creator_roles.map(
-                    (creator) => creator.creator_role_a
-                ),
-                creator_roles_b: creator_roles.map(
-                    (creator) => creator.creator_role_b
-                ),
+                creator_roles_a: creator_roles.map((creator) => creator.creator_role_a),
+                creator_roles_b: creator_roles.map((creator) => creator.creator_role_b),
             };
         }
         if (shared_tags.length > 0) {
@@ -278,11 +245,7 @@ const GameScreen = () => {
                     }}
                     suggestions={suggestions.map((suggestion) => {
                         return {
-                            label: `${suggestion.name} ${
-                                suggestion.year_text != ""
-                                    ? `(${suggestion.year_text})`
-                                    : ""
-                            }`,
+                            label: `${suggestion.name} ${suggestion.year_text != "" ? `(${suggestion.year_text})` : ""}`,
                             search_term: suggestion.name,
                             value: suggestion.id,
                         };
@@ -303,81 +266,46 @@ const GameScreen = () => {
                     Search by Name
                 </button>
             </div>
+            <div style={{ height: "50px" }} />
             {errorText != "" && <p style={{ color: "#f33" }}>{errorText}</p>}
-            {matchType && (
-                <>
-                    {matchType.type == MatchType.None && (
-                        <div>No matches found. Try again.</div>
-                    )}
-                    {matchType.type == MatchType.Tags && (
-                        <>
-                            <div>
-                                Success! Game matches on the following tags:
-                            </div>
-                            {matchType.tag_ids?.map((tag_id) => (
-                                <p key={tag_id}>
-                                    {unescapeChars(tag_data[tag_id].name)}{" "}
-                                    {tag_data[tag_id].emoji}{" "}
-                                    {[1, 2, 3].map((num) =>
-                                        tagUsedCount[tag_id] >= num
-                                            ? String.fromCodePoint(0x2611)
-                                            : String.fromCodePoint(0x2610)
+            {gameLinkHistory.length > 0 && <>{gameLinkHistory.at(-1)?.match.type == MatchType.None && <div>No matches found. Try again.</div>}</>}
+            {gameHistory[0]?.data && (
+                <div>
+                    {gameHistory
+                        .slice(0)
+                        .reverse()
+                        .map((game, index) => {
+                            const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
+                            return (
+                                <div key={game.id}>
+                                    <GameHistoryItem data={game.data} />
+                                    {index !== gameHistory.length - 1 && (
+                                        <>
+                                            <GameHistoryConnector />
+                                            <GameHistoryLink
+                                                messages={
+                                                    gameLinkHistoryEntry?.match.type === MatchType.Tags
+                                                        ? gameLinkHistoryEntry?.match.tag_ids?.map(
+                                                              (tag, index) =>
+                                                                  `${unescapeChars(tag_data[tag].name)} ${tag_data[tag].emoji} ${[1, 2, 3]
+                                                                      .map((num) => (gameLinkHistoryEntry?.counts[index] >= num ? String.fromCodePoint(0x2611) : String.fromCodePoint(0x2610)))
+                                                                      .join("")}`
+                                                          ) ?? []
+                                                        : gameLinkHistoryEntry?.match.creators?.map((creator, index) => {
+                                                              return `${creator} 
+                                                                ${[1, 2, 3]
+                                                                    .map((num) => (gameLinkHistoryEntry?.counts[index] >= num ? String.fromCodePoint(0x2611) : String.fromCodePoint(0x2610)))
+                                                                    .join("")}`;
+                                                          }) ?? []
+                                                }
+                                            />
+                                            <GameHistoryConnector />
+                                        </>
                                     )}
-                                </p>
-                            ))}
-                        </>
-                    )}
-                    {matchType.type == MatchType.Creators && (
-                        <>
-                            <div>Success!</div>
-                            {
-                                <>
-                                    {matchType.creators?.map((creator) => {
-                                        const creator_role_a =
-                                            matchType?.creator_roles_a?.[
-                                                matchType?.creators?.indexOf(
-                                                    creator
-                                                ) ?? 0
-                                            ];
-                                        const creator_role_b =
-                                            matchType?.creator_roles_b?.[
-                                                matchType?.creators?.indexOf(
-                                                    creator
-                                                ) ?? 0
-                                            ];
-                                        return (
-                                            <p>
-                                                {creator} was the{" "}
-                                                {creator_role_a} of{" "}
-                                                {lastGameData?.name} and{" "}
-                                                {creator_role_b} of{" "}
-                                                {currentGameData?.name}{" "}
-                                                {[1, 2, 3].map((num) =>
-                                                    creatorUsedCount[creator] >=
-                                                    num
-                                                        ? String.fromCodePoint(
-                                                              0x2611
-                                                          )
-                                                        : String.fromCodePoint(
-                                                              0x2610
-                                                          )
-                                                )}
-                                            </p>
-                                        );
-                                    })}
-                                </>
-                            }
-                        </>
-                    )}
-                </>
-            )}
-            {currentGameData && (
-                <>
-                    <p>Current Game: {currentGameData.name}</p>
-                    <img
-                        src={`https://cdn.akamai.steamstatic.com/steam/apps/${currentGameId}/header.jpg`}
-                    />
-                </>
+                                </div>
+                            );
+                        })}
+                </div>
             )}
         </div>
     );

@@ -14,13 +14,7 @@ type Suggestion = {
     value: string;
 };
 
-const AutocompleteInput = ({
-    value,
-    setValue,
-    suggestions,
-    onChange,
-    onSelectSuggestion,
-}: IAutocompleteInputProps) => {
+const AutocompleteInput = ({ value, setValue, suggestions, onChange, onSelectSuggestion }: IAutocompleteInputProps) => {
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
     const suggestionbackgroundColour = "#c4c4c4";
     const suggestionHoverColour = "#a4a4a4";
@@ -60,6 +54,7 @@ const AutocompleteInput = ({
                     {suggestions.map((suggestion) => {
                         return (
                             <div
+                                key={suggestion.value}
                                 id={suggestion.value}
                                 style={{
                                     border: `1px solid ${suggestionBorderColour}`,

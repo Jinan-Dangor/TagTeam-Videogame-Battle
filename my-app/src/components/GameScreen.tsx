@@ -17,7 +17,7 @@ export type GameData = {
     review_percentage: number;
 };
 
-type TagData = {
+export type TagData = {
     name: string;
     emoji: string;
 };
@@ -29,7 +29,7 @@ type AutocompleteData = {
     review_percentage: number;
 };
 
-enum MatchType {
+export enum MatchType {
     None,
     Tags,
     Creators,
@@ -46,14 +46,21 @@ type MatchData = {
 type GameHistoryEntry = {
     id: string;
     data: GameData;
+    lifelinesUsed: Lifeline[];
 };
 
-type GameLinkHistoryEntry = {
+export enum Lifeline {
+    Skip,
+    RevealTags,
+    RevealArt,
+}
+
+export type GameLinkHistoryEntry = {
     match: MatchData;
     counts: number[];
 };
 
-function unescapeChars(str: string) {
+export function unescapeChars(str: string) {
     return new DOMParser().parseFromString(str, "text/html").documentElement.textContent;
 }
 
@@ -87,8 +94,9 @@ const GameScreen = () => {
     const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
     const [gameLinkHistory, setGameLinkHistory] = useState<GameLinkHistoryEntry[]>([]);
     const [suggestions, setSuggestions] = useState<AutocompleteData[]>([]);
-    let tag_data: { [id: string]: TagData } = {};
-    tags.forEach((tag) => (tag_data[tag.ID] = { name: tag.name, emoji: tag.emoji }));
+    const [lifelinesUsed, setLifelinesUsed] = useState<Lifeline[]>([]);
+    let tagData: { [id: string]: TagData } = {};
+    tags.forEach((tag) => (tagData[tag.ID] = { name: tag.name, emoji: tag.emoji }));
 
     useEffect(() => {
         const firstGameId = "440";
@@ -99,7 +107,7 @@ const GameScreen = () => {
             const response_json = await response.json();
             if (response_json.responses[0].success) {
                 const first_game_data = response_json.responses[0];
-                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), { id: firstGameId, data: first_game_data }]);
+                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), { id: firstGameId, data: first_game_data, lifelinesUsed: [] }]);
             }
         });
     }, []);
@@ -118,13 +126,12 @@ const GameScreen = () => {
     }, [nameSearchTerm]);
 
     useEffect(() => {
-        setErrorText(``);
         if (newGameId != "") {
-            search_for_game(newGameId);
+            searchForGame(newGameId);
         }
     }, [newGameId]);
 
-    const search_for_game = (id: string) => {
+    const searchForGame = (id: string) => {
         fetch(`http://127.0.0.1:3001/?game_info=${id}`).then(async (response) => {
             const response_json = await response.json();
             if (response_json.responses[0].success) {
@@ -141,7 +148,7 @@ const GameScreen = () => {
                         for (let i = 0; i < (match_result.tag_ids?.length ?? 0); i++) {
                             const new_tag_id = match_result.tag_ids?.[i] ?? 0;
                             if (tagUsedCount[new_tag_id] >= 3) {
-                                setErrorText(`${tag_data[new_tag_id].name} has already been played 3 times.`);
+                                setErrorText(`${tagData[new_tag_id].name} has already been played 3 times.`);
                                 return;
                             }
                             if (new_tag_id in tagUsedCount) {
@@ -176,9 +183,12 @@ const GameScreen = () => {
                         });
                     }
                     if (match_result.type != MatchType.None) {
-                        setGameHistory([...gameHistory, { id: newGameId, data: new_game_data }]);
+                        setGameHistory([...gameHistory, { id: newGameId, data: new_game_data, lifelinesUsed: [] }]);
                         setUsedGameIds([...usedGameIds, newGameId]);
                         setGameLinkHistory([...gameLinkHistory, { match: match_result, counts: new_counts }]);
+                        setErrorText("");
+                    } else {
+                        setErrorText(`No connections to ${new_game_data.name}${new_game_data.year_text ? ` (${new_game_data.year_text})` : ""}.`);
                     }
                     setNewGameId("");
                 }
@@ -237,6 +247,22 @@ const GameScreen = () => {
     return (
         <div className="App">
             <h1>Singleplayer Battle Test</h1>
+            <button
+                type="button"
+                onClick={() => {
+                    setLifelinesUsed([...lifelinesUsed, Lifeline.RevealArt]);
+                }}
+            >
+                Use Art Lifeline
+            </button>
+            <button
+                type="button"
+                onClick={() => {
+                    setLifelinesUsed([...lifelinesUsed, Lifeline.RevealTags]);
+                }}
+            >
+                Use Tag Lifeline
+            </button>
             <div>
                 <AutocompleteInput
                     value={nameSearchTerm}
@@ -260,7 +286,7 @@ const GameScreen = () => {
                     onClick={() => {
                         setNameSearchTerm(suggestions[0].name);
                         setNewGameId(suggestions[0].id);
-                        search_for_game(suggestions[0].id);
+                        searchForGame(suggestions[0].id);
                     }}
                 >
                     Search by Name
@@ -278,27 +304,11 @@ const GameScreen = () => {
                             const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
                             return (
                                 <div key={game.id}>
-                                    <GameHistoryItem data={game.data} />
+                                    <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={lifelinesUsed} />
                                     {index !== gameHistory.length - 1 && (
                                         <>
                                             <GameHistoryConnector />
-                                            <GameHistoryLink
-                                                messages={
-                                                    gameLinkHistoryEntry?.match.type === MatchType.Tags
-                                                        ? gameLinkHistoryEntry?.match.tag_ids?.map(
-                                                              (tag, index) =>
-                                                                  `${unescapeChars(tag_data[tag].name)} ${tag_data[tag].emoji} ${[1, 2, 3]
-                                                                      .map((num) => (gameLinkHistoryEntry?.counts[index] >= num ? String.fromCodePoint(0x2611) : String.fromCodePoint(0x2610)))
-                                                                      .join("")}`
-                                                          ) ?? []
-                                                        : gameLinkHistoryEntry?.match.creators?.map((creator, index) => {
-                                                              return `${creator} 
-                                                                ${[1, 2, 3]
-                                                                    .map((num) => (gameLinkHistoryEntry?.counts[index] >= num ? String.fromCodePoint(0x2611) : String.fromCodePoint(0x2610)))
-                                                                    .join("")}`;
-                                                          }) ?? []
-                                                }
-                                            />
+                                            <GameHistoryLink gameLinkHistoryEntry={gameLinkHistoryEntry} tagData={tagData} />
                                             <GameHistoryConnector />
                                         </>
                                     )}

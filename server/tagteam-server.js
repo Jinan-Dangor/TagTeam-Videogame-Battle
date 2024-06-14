@@ -63,10 +63,7 @@ const server = createServer(async (req, res) => {
     res.setHeader("Content-Type", "text/plain");
     res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
     res.setHeader("Access-Control-Allow-Methods", "GET");
-    res.setHeader(
-        "Access-Control-Allow-Headers",
-        "X-Requested-With,content-type"
-    );
+    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,content-type");
     res.setHeader("Access-Control-Allow-Credentials", true);
     let response = { responses: [] };
     for (let i = 0; i < query_objects.length; i++) {
@@ -82,49 +79,29 @@ const server = createServer(async (req, res) => {
             const game = game_database[target_game_id];
             response.responses.push({ success: true, ...game });
         } else if (query_objects[i].type == "autocomplete_games") {
-            const search_term = simplify_game_name_search_term(
-                decodeURIComponent(query_objects[i].body)
-            );
+            const search_term = simplify_game_name_search_term(decodeURIComponent(query_objects[i].body));
             const valid_games = Object.keys(game_database)
-                .filter((id) =>
-                    simplify_game_name_search_term(
-                        game_database[id].name
-                    ).includes(search_term)
-                )
+                .filter((id) => simplify_game_name_search_term(game_database[id].name).includes(search_term))
                 .map((id) => {
                     return {
                         id,
                         name: game_database[id].name,
                         year_text: getReleaseYearString(game_database[id]),
-                        review_percentage: Number(
-                            game_database[id].review_percentage
-                        ),
+                        review_percentage: Number(game_database[id].review_percentage),
                         review_score: Number(game_database[id].review_score),
                     };
                 })
                 .sort((a, b) => {
-                    const simple_name_a = simplify_game_name_search_term(
-                        a.name
-                    );
-                    const simple_name_b = simplify_game_name_search_term(
-                        b.name
-                    );
+                    const simple_name_a = simplify_game_name_search_term(a.name);
+                    const simple_name_b = simplify_game_name_search_term(b.name);
                     const score_a = a.review_percentage + 10 * a.review_score;
-                    const starting_mod_a = simple_name_a.startsWith(search_term)
-                        ? 1000
-                        : 0;
-                    const perfect_mod_a =
-                        simple_name_a == search_term ? 10000 : 0;
+                    const starting_mod_a = simple_name_a.startsWith(search_term) ? 1000 : 0;
+                    const perfect_mod_a = simple_name_a == search_term ? 10000 : 0;
                     const score_b = b.review_percentage + 10 * b.review_score;
-                    const starting_mod_b = simple_name_b.startsWith(search_term)
-                        ? 1000
-                        : 0;
-                    const perfect_mod_b =
-                        simple_name_b == search_term ? 10000 : 0;
-                    const final_score_a =
-                        score_a + starting_mod_a + perfect_mod_a;
-                    const final_score_b =
-                        score_b + starting_mod_b + perfect_mod_b;
+                    const starting_mod_b = simple_name_b.startsWith(search_term) ? 1000 : 0;
+                    const perfect_mod_b = simple_name_b == search_term ? 10000 : 0;
+                    const final_score_a = score_a + starting_mod_a + perfect_mod_a;
+                    const final_score_b = score_b + starting_mod_b + perfect_mod_b;
                     return final_score_b - final_score_a;
                 })
                 .slice(0, 10);
@@ -156,9 +133,7 @@ function server_ready() {
 
 async function retrieve_skipped_ids() {
     if (fs.existsSync(skipped_ids_file)) {
-        skipped_ids = JSON.parse(
-            fs.readFileSync(skipped_ids_file, { encoding: "utf-8" })
-        );
+        skipped_ids = JSON.parse(fs.readFileSync(skipped_ids_file, { encoding: "utf-8" }));
     }
 }
 
@@ -172,33 +147,15 @@ async function retrieve_game_name_to_ids() {
             return;
         }
     }
-    game_name_to_ids = new Map(
-        Object.entries(
-            JSON.parse(
-                fs.readFileSync(game_name_to_ids_file, { encoding: "utf-8" })
-            )
-        )
-    );
-    expected_num_of_games = Array.from(game_name_to_ids.values()).reduce(
-        (partialSum, a) => partialSum + a.length,
-        0
-    );
+    game_name_to_ids = new Map(Object.entries(JSON.parse(fs.readFileSync(game_name_to_ids_file, { encoding: "utf-8" }))));
+    expected_num_of_games = Array.from(game_name_to_ids.values()).reduce((partialSum, a) => partialSum + a.length, 0);
 }
 
 async function retrieve_game_database() {
     if (fs.existsSync(game_database_file)) {
-        game_database = JSON.parse(
-            fs.readFileSync(game_database_file, { encoding: "utf-8" })
-        );
-        if (
-            Object.keys(game_database).length + skipped_ids.length <
-            expected_num_of_games
-        ) {
-            console.log(
-                `Expected ${expected_num_of_games} games, only found ${
-                    Object.keys(game_database).length + skipped_ids.length
-                } in database. Recovering missing games...`
-            );
+        game_database = JSON.parse(fs.readFileSync(game_database_file, { encoding: "utf-8" }));
+        if (Object.keys(game_database).length + skipped_ids.length < expected_num_of_games) {
+            console.log(`Expected ${expected_num_of_games} games, only found ${Object.keys(game_database).length + skipped_ids.length} in database. Recovering missing games...`);
         } else {
             server_ready();
             return;
@@ -213,17 +170,13 @@ async function store_game_name_to_ids() {
     let steam_webapi_data = {};
 
     {
-        const fetch_response = await fetch(
-            `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${api_key}&have_description_language=english&max_results=50000`
-        ).catch(function (err) {
+        const fetch_response = await fetch(`https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${api_key}&have_description_language=english&max_results=50000`).catch(function (err) {
             console.log("Unable to fetch -", err);
         });
 
         const json_response = await fetch_response.text();
         if (!json_response) {
-            console.log(
-                "Cannot construct list of game ids due to rate limited API, try again later."
-            );
+            console.log("Cannot construct list of game ids due to rate limited API, try again later.");
             return false;
         }
 
@@ -243,9 +196,7 @@ async function store_game_name_to_ids() {
 
         const json_response = await fetch_response.text();
         if (!json_response) {
-            console.log(
-                "Cannot construct list of game ids due to rate limited API, try again later."
-            );
+            console.log("Cannot construct list of game ids due to rate limited API, try again later.");
             return false;
         }
 
@@ -265,15 +216,11 @@ async function store_game_name_to_ids() {
         }
         game_name_to_ids.get(simple_name).push(games_list[i].appid);
     }
-    fs.writeFileSync(
-        game_name_to_ids_file,
-        JSON.stringify(Object.fromEntries(game_name_to_ids)),
-        (err) => {
-            if (err) {
-                console.log("Unable to write -", err);
-            }
+    fs.writeFileSync(game_name_to_ids_file, JSON.stringify(Object.fromEntries(game_name_to_ids)), (err) => {
+        if (err) {
+            console.log("Unable to write -", err);
         }
-    );
+    });
     return true;
 }
 
@@ -291,42 +238,28 @@ async function store_game_database(limit = undefined) {
     client.logOn({ anonymous: true });
     client.on("loggedOn", async () => {
         console.log("Successfully logged on to Steam interface.");
-        console.log(
-            `Every ${notification_period_in_games} games, you will be notified of progress and progress will be saved.`
-        );
+        console.log(`Every ${notification_period_in_games} games, you will be notified of progress and progress will be saved.`);
         let games_added = 0;
         const start_time = Date.now();
-        keyLoop: for (
-            let i = 0;
-            games_added < limit && i < map_keys.length;
-            i++
-        ) {
+        keyLoop: for (let i = 0; games_added < limit && i < map_keys.length; i++) {
             const relevant_ids = game_name_to_ids.get(map_keys[i]);
             for (let j = 0; j < relevant_ids.length; j++) {
                 const target_game_id = relevant_ids[j];
                 //console.log(target_game_id);
-                if (
-                    game_database[target_game_id] ||
-                    skipped_ids.includes(target_game_id)
-                ) {
+                if (game_database[target_game_id] || skipped_ids.includes(target_game_id)) {
                     continue;
                 }
                 try {
-                    const steamuser_response = await client.getProductInfo(
-                        [target_game_id],
-                        [],
-                        (err) => {
-                            if (err) {
-                                console.log(err);
-                            }
+                    const steamuser_response = await client.getProductInfo([target_game_id], [], (err) => {
+                        if (err) {
+                            console.log(err);
                         }
-                    );
+                    });
                     if (steamuser_response.unknownApps.length > 0) {
                         skipped_ids.push(target_game_id);
                         continue;
                     }
-                    const steamuser_data =
-                        steamuser_response.apps[target_game_id].appinfo;
+                    const steamuser_data = steamuser_response.apps[target_game_id].appinfo;
                     if (!steamuser_data?.common?.name) {
                         skipped_ids.push(target_game_id);
                         continue;
@@ -337,37 +270,18 @@ async function store_game_database(limit = undefined) {
                     const associations = steamuser_data.common.associations;
                     const association_indices = Object.keys(associations);
                     for (let i = 0; i < association_indices.length; i++) {
-                        if (
-                            associations[association_indices[i]].type ==
-                            "developer"
-                        ) {
-                            developers.push(
-                                associations[association_indices[i]].name
-                            );
-                        } else if (
-                            associations[association_indices[i]].type ==
-                            "publisher"
-                        ) {
-                            publishers.push(
-                                associations[association_indices[i]].name
-                            );
+                        if (associations[association_indices[i]].type == "developer") {
+                            developers.push(associations[association_indices[i]].name);
+                        } else if (associations[association_indices[i]].type == "publisher") {
+                            publishers.push(associations[association_indices[i]].name);
                         }
                     }
-                    const tag_ids = steamuser_data.common.store_tags
-                        ? Object.values(steamuser_data.common.store_tags)
-                        : [];
-                    const has_release_date =
-                        steamuser_data?.common?.steam_release_date !=
-                            undefined ||
-                        steamuser_data?.common?.ReleaseState != undefined;
-                    const steam_release_state =
-                        steamuser_data?.common?.ReleaseState;
-                    const steam_release_date =
-                        steamuser_data?.common?.steam_release_date;
-                    const review_score =
-                        steamuser_data.common.review_score ?? 0;
-                    const review_percentage =
-                        steamuser_data.common.review_percentage ?? 0;
+                    const tag_ids = steamuser_data.common.store_tags ? Object.values(steamuser_data.common.store_tags) : [];
+                    const has_release_date = steamuser_data?.common?.steam_release_date != undefined || steamuser_data?.common?.ReleaseState != undefined;
+                    const steam_release_state = steamuser_data?.common?.ReleaseState;
+                    const steam_release_date = steamuser_data?.common?.steam_release_date;
+                    const review_score = steamuser_data.common.review_score ?? 0;
+                    const review_percentage = steamuser_data.common.review_percentage ?? 0;
                     const database_entry = {
                         name,
                         developers,
@@ -383,30 +297,20 @@ async function store_game_database(limit = undefined) {
                     if (games_added % notification_period_in_games == 0) {
                         console.log(`${games_added} games added.`);
                         game_database = { ...game_database, ...database };
-                        fs.writeFileSync(
-                            game_database_file,
-                            JSON.stringify(game_database),
-                            (err) => {
-                                if (err) {
-                                    console.log("Unable to write -", err);
-                                }
+                        fs.writeFileSync(game_database_file, JSON.stringify(game_database), (err) => {
+                            if (err) {
+                                console.log("Unable to write -", err);
                             }
-                        );
-                        fs.writeFileSync(
-                            skipped_ids_file,
-                            JSON.stringify(skipped_ids),
-                            (err) => {
-                                if (err) {
-                                    console.log("Unable to write -", err);
-                                }
+                        });
+                        fs.writeFileSync(skipped_ids_file, JSON.stringify(skipped_ids), (err) => {
+                            if (err) {
+                                console.log("Unable to write -", err);
                             }
-                        );
+                        });
                     }
                     database[target_game_id] = database_entry;
                 } catch (err) {
-                    console.log(
-                        `The following error occured while parsing game with ID ${target_game_id}, skipping.`
-                    );
+                    console.log(`The following error occured while parsing game with ID ${target_game_id}, skipping.`);
                     console.log(err);
                 }
             }
@@ -414,33 +318,20 @@ async function store_game_database(limit = undefined) {
         client.logOff();
         console.log("Successfully logged off from Steam interface.");
         game_database = { ...game_database, ...database };
-        fs.writeFileSync(
-            game_database_file,
-            JSON.stringify(game_database),
-            (err) => {
-                if (err) {
-                    console.log("Unable to write -", err);
-                }
+        fs.writeFileSync(game_database_file, JSON.stringify(game_database), (err) => {
+            if (err) {
+                console.log("Unable to write -", err);
             }
-        );
-        const num_entries_not_found =
-            expected_num_of_games -
-            Object.keys(game_database).length -
-            skipped_ids.length;
+        });
+        const num_entries_not_found = expected_num_of_games - Object.keys(game_database).length - skipped_ids.length;
         if (num_entries_not_found == 0) {
             console.log(`Generated.`);
         } else {
-            console.log(
-                `Incomplete database recovery - missing ${num_entries_not_found} records (have ${
-                    Object.keys(game_database).length + skipped_ids.length
-                }). Rerun server to continue download.`
-            );
+            console.log(`Incomplete database recovery - missing ${num_entries_not_found} records (have ${Object.keys(game_database).length + skipped_ids.length}). Rerun server to continue download.`);
         }
         const end_time = Date.now();
         const elapsed_time = new Date(end_time - start_time);
-        console.log(
-            `Operations completed in ${elapsed_time / 1000 / 60} minutes.`
-        );
+        console.log(`Operations completed in ${elapsed_time / 1000 / 60} minutes.`);
         server_ready();
     });
 }
@@ -452,10 +343,7 @@ function simplify_game_name_search_term(game_name) {
 function filter_game_by_name(game_name) {
     const simplified_name = simplify_game_name_search_term(game_name);
     const numbers_only_name = game_name.replace(/[^0-9]/g, "");
-    if (
-        simplified_name == "" ||
-        (game_name != simplified_name && simplified_name == numbers_only_name)
-    ) {
+    if (simplified_name == "" || (game_name != simplified_name && simplified_name == numbers_only_name)) {
         return false;
     }
     return true;

@@ -1,0 +1,72 @@
+.game-history-item {
+    display: inline-block;
+    height: 180px;
+    margin: auto;
+    background-color: grey;
+    border-width: 5px;
+    border-color: black;
+    border-style: solid;
+    border-radius: 10px;
+}
+
+.game-history-item .game-history-container {
+    display: flex;
+    vertical-align: middle;
+    align-items: center;
+}
+
+.game-history-item .revealed-art {
+    height: 150px;
+    border-radius: 10px;
+    margin: 15px;
+}
+
+.game-history-item .revealed-art-container {
+    overflow: hidden;
+    animation: 1s ease-in 0s 1 slide-out;
+}
+
+.game-history-item .game-details {
+    display: flex;
+    flex-direction: column;
+    height: 150px;
+    vertical-align: middle;
+    margin: 15px;
+}
+
+.game-history-item .game-details .game-title {
+}
+
+.game-history-item .revealed-tags {
+    width: 500px;
+    overflow: hidden;
+    animation: 1s ease-in 0s 1 slide-down;
+}
+
+.game-history-item .revealed-tags .revealed-tag {
+    display: inline-block;
+    height: 20px;
+    background-color: midnightblue;
+    color: white;
+    border-radius: 5px;
+    margin: 2px;
+    padding: 2px;
+}
+
+@keyframes slide-out {
+    0% {
+        width: 0px;
+    }
+    100% {
+        width: 320.992px;
+    }
+}
+
+@keyframes slide-down {
+    0% {
+        height: 0px;
+    }
+    100% {
+        height: 120px;
+    }
+}

@@ -247,22 +247,33 @@ const GameScreen = () => {
     return (
         <div className="App">
             <h1>Singleplayer Battle Test</h1>
-            <button
-                type="button"
-                onClick={() => {
-                    setLifelinesUsed([...lifelinesUsed, Lifeline.RevealArt]);
-                }}
-            >
-                Use Art Lifeline
-            </button>
-            <button
-                type="button"
-                onClick={() => {
-                    setLifelinesUsed([...lifelinesUsed, Lifeline.RevealTags]);
-                }}
-            >
-                Use Tag Lifeline
-            </button>
+            {!lifelinesUsed.includes(Lifeline.RevealArt) && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        setLifelinesUsed([...lifelinesUsed, Lifeline.RevealArt]);
+                        let currentGame = gameHistory[gameHistory.length - 1];
+                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
+                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                    }}
+                >
+                    Use Art Lifeline
+                </button>
+            )}
+            {!lifelinesUsed.includes(Lifeline.RevealTags) && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        setLifelinesUsed([...lifelinesUsed, Lifeline.RevealTags]);
+                        let currentGame = gameHistory[gameHistory.length - 1];
+                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
+                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                    }}
+                >
+                    Use Tag Lifeline
+                </button>
+            )}
+
             <div>
                 <AutocompleteInput
                     value={nameSearchTerm}
@@ -304,7 +315,7 @@ const GameScreen = () => {
                             const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
                             return (
                                 <div key={game.id}>
-                                    <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={lifelinesUsed} />
+                                    <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} />
                                     {index !== gameHistory.length - 1 && (
                                         <>
                                             <GameHistoryConnector />

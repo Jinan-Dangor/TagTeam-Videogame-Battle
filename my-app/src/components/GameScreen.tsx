@@ -273,7 +273,6 @@ const GameScreen = () => {
                     Use Tag Lifeline
                 </button>
             )}
-
             <div>
                 <AutocompleteInput
                     value={nameSearchTerm}
@@ -295,9 +294,11 @@ const GameScreen = () => {
                 <button
                     type="button"
                     onClick={() => {
-                        setNameSearchTerm(suggestions[0].name);
-                        setNewGameId(suggestions[0].id);
-                        searchForGame(suggestions[0].id);
+                        if (suggestions[0]) {
+                            setNameSearchTerm(suggestions[0].name);
+                            setNewGameId(suggestions[0].id);
+                            searchForGame(suggestions[0].id);
+                        }
                     }}
                 >
                     Search by Name
@@ -305,7 +306,6 @@ const GameScreen = () => {
             </div>
             <div style={{ height: "50px" }} />
             {errorText != "" && <p style={{ color: "#f33" }}>{errorText}</p>}
-            {gameLinkHistory.length > 0 && <>{gameLinkHistory.at(-1)?.match.type == MatchType.None && <div>No matches found. Try again.</div>}</>}
             {gameHistory[0]?.data && (
                 <div>
                     {gameHistory

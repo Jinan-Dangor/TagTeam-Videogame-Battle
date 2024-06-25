@@ -2,8 +2,6 @@
 
 .game-history-item {
     display: inline-block;
-    position: fixed;
-    right: 35vw;
     height: auto;
     font-family: Oswald, Tahoma, Geneva, Verdana, sans-serif;
     font-weight: 400;

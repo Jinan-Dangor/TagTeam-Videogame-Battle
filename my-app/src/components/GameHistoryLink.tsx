@@ -16,16 +16,26 @@ const StrikeTicks = ({ numStrikes }: IStrikeTicksProps) => {
 
 const GameHistoryItem = ({ gameLinkHistoryEntry, tagData }: IGameHistoryItemProps) => {
     return (
-        <div style={{ borderWidth: "5px", borderColor: "black", borderStyle: "solid", width: "15%", margin: "auto", borderRadius: "10px", backgroundColor: "grey" }}>
+        <div
+            style={{
+                borderWidth: "5px",
+                borderColor: "black",
+                borderStyle: "solid",
+                width: "15%",
+                margin: "auto",
+                borderRadius: "10px",
+                backgroundColor: "grey",
+            }}
+        >
             {(gameLinkHistoryEntry?.match.type === MatchType.Tags
                 ? gameLinkHistoryEntry?.match.tag_ids?.map((tag) => `${unescapeChars(tagData[tag].name)} ${tagData[tag].emoji}`) ?? []
                 : gameLinkHistoryEntry?.match.creators?.map((creator) => `${creator}`) ?? []
             ).map((line, index) => {
                 return (
-                    <>
+                    <div key={index}>
                         <div key={index}>{line}</div>
                         <StrikeTicks numStrikes={gameLinkHistoryEntry.counts[index]} />
-                    </>
+                    </div>
                 );
             })}
         </div>

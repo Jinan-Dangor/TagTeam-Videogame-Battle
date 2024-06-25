@@ -315,7 +315,10 @@ const GameScreen = () => {
                             const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
                             return (
                                 <div key={game.id}>
-                                    <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} />
+                                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                        <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} />
+                                        <div style={{ width: "35vw" }} />
+                                    </div>
                                     {index !== gameHistory.length - 1 && (
                                         <>
                                             <GameHistoryConnector />

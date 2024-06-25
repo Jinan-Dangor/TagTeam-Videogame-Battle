@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import tags from "../scripts/scrapedTags.json";
 import AutocompleteInput from "./AutocompleteInput";
 import GameHistoryItem from "./GameHistoryItem";
@@ -60,6 +60,11 @@ export type GameLinkHistoryEntry = {
     counts: number[];
 };
 
+enum Player {
+    P1,
+    P2,
+}
+
 export function unescapeChars(str: string) {
     return new DOMParser().parseFromString(str, "text/html").documentElement.textContent;
 }
@@ -94,7 +99,25 @@ const GameScreen = () => {
     const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
     const [gameLinkHistory, setGameLinkHistory] = useState<GameLinkHistoryEntry[]>([]);
     const [suggestions, setSuggestions] = useState<AutocompleteData[]>([]);
-    const [lifelinesUsed, setLifelinesUsed] = useState<Lifeline[]>([]);
+    const [currentPlayer, setCurrentPlayer] = useState<Player>(Player.P1);
+    const switchPlayer = () => {
+        if (currentPlayer === Player.P1) {
+            setCurrentPlayer(Player.P2);
+        } else {
+            setCurrentPlayer(Player.P1);
+        }
+    };
+    const [lifelinesUsed, setLifelinesUsed] = useState<Map<Player, Lifeline[]>>(
+        new Map<Player, Lifeline[]>([
+            [Player.P1, []],
+            [Player.P2, []],
+        ])
+    );
+    const useLifeline = (lifeline: Lifeline) => {
+        const tempLifelinesUsed = lifelinesUsed;
+        tempLifelinesUsed[currentPlayer].push(lifeline);
+        setLifelinesUsed(tempLifelinesUsed);
+    };
     let tagData: { [id: string]: TagData } = {};
     tags.forEach((tag) => (tagData[tag.ID] = { name: tag.name, emoji: tag.emoji }));
 
@@ -187,6 +210,7 @@ const GameScreen = () => {
                         setUsedGameIds([...usedGameIds, newGameId]);
                         setGameLinkHistory([...gameLinkHistory, { match: match_result, counts: new_counts }]);
                         setErrorText("");
+                        switchPlayer();
                     } else {
                         setErrorText(`No connections to ${new_game_data.name}${new_game_data.year_text ? ` (${new_game_data.year_text})` : ""}.`);
                     }
@@ -247,11 +271,14 @@ const GameScreen = () => {
     return (
         <div className="App">
             <h1>Singleplayer Battle Test</h1>
-            {!lifelinesUsed.includes(Lifeline.RevealArt) && (
+            <p>Current Player: {currentPlayer === Player.P1 ? "Player 1" : "Player 2"}</p>
+            {!lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealArt) && (
                 <button
                     type="button"
                     onClick={() => {
-                        setLifelinesUsed([...lifelinesUsed, Lifeline.RevealArt]);
+                        const tempLifelinesUsed = lifelinesUsed;
+                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
+                        setLifelinesUsed(tempLifelinesUsed);
                         let currentGame = gameHistory[gameHistory.length - 1];
                         currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
                         setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
@@ -260,11 +287,13 @@ const GameScreen = () => {
                     Use Art Lifeline
                 </button>
             )}
-            {!lifelinesUsed.includes(Lifeline.RevealTags) && (
+            {!lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealTags) && (
                 <button
                     type="button"
                     onClick={() => {
-                        setLifelinesUsed([...lifelinesUsed, Lifeline.RevealTags]);
+                        const tempLifelinesUsed = lifelinesUsed;
+                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
+                        setLifelinesUsed(tempLifelinesUsed);
                         let currentGame = gameHistory[gameHistory.length - 1];
                         currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
                         setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);

@@ -71,6 +71,11 @@
     padding: 1px;
 }
 
+.game-history-item .game-details .view-details-button {
+    width: 100px;
+    align-self: center;
+}
+
 @keyframes slide-out {
     0% {
         width: 0px;

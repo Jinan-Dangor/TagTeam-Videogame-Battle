@@ -27,17 +27,19 @@ const GameHistoryItem = ({ gameLinkHistoryEntry, tagData }: IGameHistoryItemProp
                 backgroundColor: "grey",
             }}
         >
-            {(gameLinkHistoryEntry?.match.type === MatchType.Tags
-                ? gameLinkHistoryEntry?.match.tag_ids?.map((tag) => `${unescapeChars(tagData[tag].name)} ${tagData[tag].emoji}`) ?? []
-                : gameLinkHistoryEntry?.match.creators?.map((creator) => `${creator}`) ?? []
-            ).map((line, index) => {
-                return (
-                    <div key={index}>
-                        <div key={index}>{line}</div>
-                        <StrikeTicks numStrikes={gameLinkHistoryEntry.counts[index]} />
-                    </div>
-                );
-            })}
+            {(gameLinkHistoryEntry?.match.type === MatchType.Tags || gameLinkHistoryEntry?.match.type === MatchType.Creators) &&
+                (gameLinkHistoryEntry?.match.type === MatchType.Tags
+                    ? gameLinkHistoryEntry?.match.tag_ids?.map((tag) => `${unescapeChars(tagData[tag].name)} ${tagData[tag].emoji}`) ?? []
+                    : gameLinkHistoryEntry?.match.creators?.map((creator) => `${creator}`) ?? []
+                ).map((line, index) => {
+                    return (
+                        <div key={index}>
+                            <div key={index}>{line}</div>
+                            <StrikeTicks numStrikes={gameLinkHistoryEntry.counts[index]} />
+                        </div>
+                    );
+                })}
+            {gameLinkHistoryEntry?.match.type === MatchType.Skip && <div>Skipped</div>}
         </div>
     );
 };

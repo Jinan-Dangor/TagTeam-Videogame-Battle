@@ -34,6 +34,7 @@ export enum MatchType {
     None,
     Tags,
     Creators,
+    Skip,
 }
 
 type MatchData = {
@@ -64,6 +65,12 @@ export type GameLinkHistoryEntry = {
 enum Player {
     P1,
     P2,
+}
+
+enum GameResult {
+    P1Win,
+    P2Win,
+    Draw,
 }
 
 export function unescapeChars(str: string) {
@@ -119,6 +126,7 @@ const GameScreen = () => {
     const TIME_LIMIT_MS = 45000;
     const [timerTimeLeft, setTimerTimeLeft] = useState(TIME_LIMIT_MS);
     const [gameIsOver, setGameIsOver] = useState(false);
+    const [gameResult, setGameResult] = useState<GameResult | null>(null);
     let tagData: { [id: string]: TagData } = {};
     tags.forEach((tag) => (tagData[tag.ID] = { name: tag.name, emoji: tag.emoji }));
 
@@ -284,7 +292,7 @@ const GameScreen = () => {
                     Start Game
                 </button>
             )}
-            {gameStarted && (
+            {gameStarted && !gameIsOver && (
                 <>
                     <p>Current Player: {currentPlayer === Player.P1 ? "Player 1" : "Player 2"}</p>
                     {!lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealArt) && (
@@ -317,6 +325,37 @@ const GameScreen = () => {
                             }}
                         >
                             Use Tag Lifeline
+                        </button>
+                    )}
+                    {!lifelinesUsed.get(currentPlayer)?.includes(Lifeline.Skip) && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
+                                    setGameIsOver(true);
+                                    setGameResult(GameResult.Draw);
+                                    setGameHistory([
+                                        ...gameHistory.slice(0, gameHistory.length - 1),
+                                        {
+                                            ...gameHistory[gameHistory.length - 1],
+                                            lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
+                                        },
+                                    ]);
+                                    return;
+                                }
+                                const tempLifelinesUsed = lifelinesUsed;
+                                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
+                                setLifelinesUsed(tempLifelinesUsed);
+                                let currentGame = gameHistory[gameHistory.length - 1];
+                                currentGame = { ...currentGame, lifelinesUsed: [] };
+                                setGameHistory([...gameHistory, currentGame]);
+                                setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
+                                setErrorText("");
+                                switchPlayer();
+                                setTimerTimeLeft(TIME_LIMIT_MS);
+                            }}
+                        >
+                            Use Skip Lifeline
                         </button>
                     )}
                     <div>
@@ -357,6 +396,7 @@ const GameScreen = () => {
                         setIsCountingDown={setTimerActive}
                         onTimerFinished={() => {
                             setGameIsOver(true);
+                            setGameResult(currentPlayer === Player.P2 ? GameResult.P1Win : GameResult.P2Win);
                             setGameHistory([
                                 ...gameHistory.slice(0, gameHistory.length - 1),
                                 {
@@ -368,9 +408,16 @@ const GameScreen = () => {
                     />
                 </>
             )}
-            {gameIsOver && <h2>Game Over. Player {currentPlayer === Player.P2 ? "1" : "2"} wins!</h2>}
+            {gameIsOver && (
+                <>
+                    <h2>Game Over.</h2>
+                    {gameResult === GameResult.P1Win && <h3>Player 1 wins!</h3>}
+                    {gameResult === GameResult.P2Win && <h3>Player 2 wins!</h3>}
+                    {gameResult === GameResult.Draw && <h3>Draw!</h3>}
+                </>
+            )}
             <div style={{ height: "50px" }} />
-            {errorText != "" && <p style={{ color: "#f33" }}>{errorText}</p>}
+            {!gameIsOver && errorText != "" && <p style={{ color: "#f33" }}>{errorText}</p>}
             {gameHistory[0]?.data && (
                 <div>
                     {gameHistory
@@ -379,9 +426,9 @@ const GameScreen = () => {
                         .map((game, index) => {
                             const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
                             return (
-                                <div key={game.id}>
+                                <div key={`${game.id}-${index}`}>
                                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                        <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} />
+                                        <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} viewDetailsButtonVisible={gameIsOver} />
                                         <div style={{ width: "35vw" }} />
                                     </div>
                                     {index !== gameHistory.length - 1 && (

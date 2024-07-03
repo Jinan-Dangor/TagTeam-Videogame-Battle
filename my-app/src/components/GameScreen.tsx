@@ -5,6 +5,7 @@ import GameHistoryItem from "./GameHistoryItem";
 import GameHistoryConnector from "./GameHistoryConnector";
 import GameHistoryLink from "./GameHistoryLink";
 import TurnTimer from "./TurnTimer";
+import LifelineButtons from "./LifelineButtons";
 
 export type GameData = {
     name: string;
@@ -62,7 +63,7 @@ export type GameLinkHistoryEntry = {
     counts: number[];
 };
 
-enum Player {
+export enum Player {
     P1,
     P2,
 }
@@ -294,46 +295,99 @@ const GameScreen = () => {
             )}
             {gameStarted && !gameIsOver && (
                 <>
-                    <p>Current Player: {currentPlayer === Player.P1 ? "Player 1" : "Player 2"}</p>
-                    {!lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealArt) && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setTimerTimeLeft(timerTimeLeft + 15000);
-                                const tempLifelinesUsed = lifelinesUsed;
-                                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
-                                setLifelinesUsed(tempLifelinesUsed);
-                                let currentGame = gameHistory[gameHistory.length - 1];
-                                currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
-                                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
-                            }}
-                        >
-                            Use Art Lifeline
-                        </button>
-                    )}
-                    {!lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealTags) && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setTimerTimeLeft(timerTimeLeft + 15000);
-                                const tempLifelinesUsed = lifelinesUsed;
-                                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
-                                setLifelinesUsed(tempLifelinesUsed);
-                                let currentGame = gameHistory[gameHistory.length - 1];
-                                currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
-                                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
-                            }}
-                        >
-                            Use Tag Lifeline
-                        </button>
-                    )}
-                    {!lifelinesUsed.get(currentPlayer)?.includes(Lifeline.Skip) && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
+                    <div style={{ display: "flex" }}>
+                        <div style={{ width: "40vw" }}>
+                            {currentPlayer === Player.P1 && (
+                                <LifelineButtons
+                                    alignment="right"
+                                    lifelinesUsed={lifelinesUsed}
+                                    currentPlayer={currentPlayer}
+                                    onClickRevealArt={() => {
+                                        setTimerTimeLeft(timerTimeLeft + 15000);
+                                        const tempLifelinesUsed = lifelinesUsed;
+                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
+                                        setLifelinesUsed(tempLifelinesUsed);
+                                        let currentGame = gameHistory[gameHistory.length - 1];
+                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
+                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                                    }}
+                                    onClickRevealTags={() => {
+                                        setTimerTimeLeft(timerTimeLeft + 15000);
+                                        const tempLifelinesUsed = lifelinesUsed;
+                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
+                                        setLifelinesUsed(tempLifelinesUsed);
+                                        let currentGame = gameHistory[gameHistory.length - 1];
+                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
+                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                                    }}
+                                    onClickSkip={() => {
+                                        if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
+                                            setGameIsOver(true);
+                                            setGameResult(GameResult.Draw);
+                                            setGameHistory([
+                                                ...gameHistory.slice(0, gameHistory.length - 1),
+                                                {
+                                                    ...gameHistory[gameHistory.length - 1],
+                                                    lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
+                                                },
+                                            ]);
+                                            return;
+                                        }
+                                        const tempLifelinesUsed = lifelinesUsed;
+                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
+                                        setLifelinesUsed(tempLifelinesUsed);
+                                        let currentGame = gameHistory[gameHistory.length - 1];
+                                        currentGame = { ...currentGame, lifelinesUsed: [] };
+                                        setGameHistory([...gameHistory, currentGame]);
+                                        setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
+                                        setErrorText("");
+                                        switchPlayer();
+                                        setTimerTimeLeft(TIME_LIMIT_MS);
+                                    }}
+                                />
+                            )}
+                        </div>
+                        <div style={{ width: "30vw" }}>
+                            <p>Current Player: {currentPlayer === Player.P1 ? "Player 1" : "Player 2"}</p>
+                            <div>
+                                <AutocompleteInput
+                                    value={nameSearchTerm}
+                                    setValue={(value) => {
+                                        setNewGameId(value);
+                                    }}
+                                    suggestions={suggestions.map((suggestion) => {
+                                        return {
+                                            label: `${suggestion.name} ${suggestion.year_text != "" ? `(${suggestion.year_text})` : ""}`,
+                                            search_term: suggestion.name,
+                                            value: suggestion.id,
+                                        };
+                                    })}
+                                    onChange={(e) => setNameSearchTerm(e.target.value)}
+                                    onSelectSuggestion={(value) => {
+                                        setNameSearchTerm(value);
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (suggestions[0]) {
+                                            setNameSearchTerm(suggestions[0].name);
+                                            setNewGameId(suggestions[0].id);
+                                            searchForGame(suggestions[0].id);
+                                        }
+                                    }}
+                                >
+                                    Search by Name
+                                </button>
+                            </div>
+                            <TurnTimer
+                                timeLeft={timerTimeLeft}
+                                setTimeLeft={setTimerTimeLeft}
+                                isCountingDown={timerActive}
+                                setIsCountingDown={setTimerActive}
+                                onTimerFinished={() => {
                                     setGameIsOver(true);
-                                    setGameResult(GameResult.Draw);
+                                    setGameResult(currentPlayer === Player.P2 ? GameResult.P1Win : GameResult.P2Win);
                                     setGameHistory([
                                         ...gameHistory.slice(0, gameHistory.length - 1),
                                         {
@@ -341,71 +395,62 @@ const GameScreen = () => {
                                             lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
                                         },
                                     ]);
-                                    return;
-                                }
-                                const tempLifelinesUsed = lifelinesUsed;
-                                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
-                                setLifelinesUsed(tempLifelinesUsed);
-                                let currentGame = gameHistory[gameHistory.length - 1];
-                                currentGame = { ...currentGame, lifelinesUsed: [] };
-                                setGameHistory([...gameHistory, currentGame]);
-                                setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
-                                setErrorText("");
-                                switchPlayer();
-                                setTimerTimeLeft(TIME_LIMIT_MS);
-                            }}
-                        >
-                            Use Skip Lifeline
-                        </button>
-                    )}
-                    <div>
-                        <AutocompleteInput
-                            value={nameSearchTerm}
-                            setValue={(value) => {
-                                setNewGameId(value);
-                            }}
-                            suggestions={suggestions.map((suggestion) => {
-                                return {
-                                    label: `${suggestion.name} ${suggestion.year_text != "" ? `(${suggestion.year_text})` : ""}`,
-                                    search_term: suggestion.name,
-                                    value: suggestion.id,
-                                };
-                            })}
-                            onChange={(e) => setNameSearchTerm(e.target.value)}
-                            onSelectSuggestion={(value) => {
-                                setNameSearchTerm(value);
-                            }}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (suggestions[0]) {
-                                    setNameSearchTerm(suggestions[0].name);
-                                    setNewGameId(suggestions[0].id);
-                                    searchForGame(suggestions[0].id);
-                                }
-                            }}
-                        >
-                            Search by Name
-                        </button>
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ width: "40vw" }}>
+                            {currentPlayer === Player.P2 && (
+                                <LifelineButtons
+                                    alignment="left"
+                                    lifelinesUsed={lifelinesUsed}
+                                    currentPlayer={currentPlayer}
+                                    onClickRevealArt={() => {
+                                        setTimerTimeLeft(timerTimeLeft + 15000);
+                                        const tempLifelinesUsed = lifelinesUsed;
+                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
+                                        setLifelinesUsed(tempLifelinesUsed);
+                                        let currentGame = gameHistory[gameHistory.length - 1];
+                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
+                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                                    }}
+                                    onClickRevealTags={() => {
+                                        setTimerTimeLeft(timerTimeLeft + 15000);
+                                        const tempLifelinesUsed = lifelinesUsed;
+                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
+                                        setLifelinesUsed(tempLifelinesUsed);
+                                        let currentGame = gameHistory[gameHistory.length - 1];
+                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
+                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                                    }}
+                                    onClickSkip={() => {
+                                        if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
+                                            setGameIsOver(true);
+                                            setGameResult(GameResult.Draw);
+                                            setGameHistory([
+                                                ...gameHistory.slice(0, gameHistory.length - 1),
+                                                {
+                                                    ...gameHistory[gameHistory.length - 1],
+                                                    lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
+                                                },
+                                            ]);
+                                            return;
+                                        }
+                                        const tempLifelinesUsed = lifelinesUsed;
+                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
+                                        setLifelinesUsed(tempLifelinesUsed);
+                                        let currentGame = gameHistory[gameHistory.length - 1];
+                                        currentGame = { ...currentGame, lifelinesUsed: [] };
+                                        setGameHistory([...gameHistory, currentGame]);
+                                        setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
+                                        setErrorText("");
+                                        switchPlayer();
+                                        setTimerTimeLeft(TIME_LIMIT_MS);
+                                    }}
+                                />
+                            )}
+                        </div>
                     </div>
-                    <TurnTimer
-                        timeLeft={timerTimeLeft}
-                        setTimeLeft={setTimerTimeLeft}
-                        isCountingDown={timerActive}
-                        setIsCountingDown={setTimerActive}
-                        onTimerFinished={() => {
-                            setGameIsOver(true);
-                            setGameResult(currentPlayer === Player.P2 ? GameResult.P1Win : GameResult.P2Win);
-                            setGameHistory([
-                                ...gameHistory.slice(0, gameHistory.length - 1),
-                                {
-                                    ...gameHistory[gameHistory.length - 1],
-                                    lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
-                                },
-                            ]);
-                        }}
-                    />
                 </>
             )}
             {gameIsOver && (
@@ -426,7 +471,7 @@ const GameScreen = () => {
                         .map((game, index) => {
                             const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
                             return (
-                                <div key={`${game.id}-${index}`}>
+                                <div key={`${game.id}-${gameLinkHistory.length - index - 1}`}>
                                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
                                         <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} viewDetailsButtonVisible={gameIsOver} />
                                         <div style={{ width: "35vw" }} />

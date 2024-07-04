@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 interface IAutocompleteInputProps {
+    placeholder?: string;
     value: string;
     setValue: (value: string) => void;
     suggestions: Suggestion[];
@@ -14,11 +15,18 @@ type Suggestion = {
     value: string;
 };
 
-const AutocompleteInput = ({ value, setValue, suggestions, onChange, onSelectSuggestion }: IAutocompleteInputProps) => {
+const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onChange, onSelectSuggestion }: IAutocompleteInputProps) => {
+    const [shouldKeepSuggestionsOpen, setShouldKeepSuggestionsOpen] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
-    const suggestionbackgroundColour = "#c4c4c4";
+    const suggestionBackgroundColour = "#c4c4c4";
     const suggestionHoverColour = "#a4a4a4";
     const suggestionBorderColour = "#949494";
+
+    useEffect(() => {
+        if (!shouldKeepSuggestionsOpen && showSuggestions) {
+            setShowSuggestions(false);
+        }
+    }, [shouldKeepSuggestionsOpen]);
 
     return (
         <span
@@ -28,28 +36,32 @@ const AutocompleteInput = ({ value, setValue, suggestions, onChange, onSelectSug
             }}
         >
             <input
+                placeholder={placeholder}
                 value={value}
                 onChange={(e) => {
                     onChange(e);
-                    setShowSuggestions(true);
+                    if (e.target.value === "") {
+                        setShowSuggestions(false);
+                    } else {
+                        setShowSuggestions(true);
+                    }
                 }}
                 onFocus={(e) => {
                     if (value != "") {
                         setShowSuggestions(true);
                     }
                 }}
-                onBlur={async (e) => {
-                    await new Promise((r) => setTimeout(r, 1000));
-                    setShowSuggestions(false);
-                }}
             />
             {showSuggestions && (
                 <div
                     style={{
                         position: "absolute",
-                        backgroundColor: suggestionbackgroundColour,
+                        backgroundColor: suggestionBackgroundColour,
                         border: `1px solid ${suggestionBorderColour}`,
+                        zIndex: "1",
                     }}
+                    onMouseEnter={() => setShouldKeepSuggestionsOpen(true)}
+                    onMouseLeave={() => setShouldKeepSuggestionsOpen(false)}
                 >
                     {suggestions.map((suggestion) => {
                         return (

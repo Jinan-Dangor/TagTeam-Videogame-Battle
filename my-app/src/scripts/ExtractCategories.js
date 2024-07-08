@@ -11,7 +11,7 @@ async function DownloadTags() {
             const matches = data.match(regex);
             const tags = matches.map((str) => {
                 const tagID = str.match(/(?<=\/tag\/)[^/]*/g)[0];
-                const tagName = str.match(/(?<=<\/span>)[^<]*/g)[0];
+                const tagName = str.match(/(?<=<\/span>)[^<]*/g)[0].replace("&amp;", "&");
                 const tagEmoji = str.match(/(?<=">)[^<]*/g)[1].slice(0, -1);
                 return { ID: tagID, name: tagName, emoji: tagEmoji };
             });

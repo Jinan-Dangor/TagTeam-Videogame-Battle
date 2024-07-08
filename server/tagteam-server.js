@@ -70,7 +70,7 @@ const server = createServer(async (req, res) => {
         if (!READY_TO_RUN) {
             response.responses.push({
                 success: false,
-                error: "Server not yet ready to recieve requests.",
+                error: "Server not yet ready to receive requests.",
             });
             continue;
         }

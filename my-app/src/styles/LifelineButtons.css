@@ -1,0 +1,20 @@
+.lifeline-buttons {
+    display: flex;
+    flex-direction: column;
+}
+
+.lifeline-buttons .lifeline-button-container {
+    margin: 5px;
+}
+
+.lifeline-buttons .lifeline-button-container.player-one .lifeline-button {
+    float: right;
+}
+
+.lifeline-buttons .lifeline-button-container.player-two .lifeline-button {
+    float: left;
+}
+
+.lifeline-buttons .lifeline-button-container .lifeline-button {
+    font-size: large;
+}

@@ -18,9 +18,9 @@ type Suggestion = {
 const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onChange, onSelectSuggestion }: IAutocompleteInputProps) => {
     const [shouldKeepSuggestionsOpen, setShouldKeepSuggestionsOpen] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
-    const suggestionBackgroundColour = "#c4c4c4";
+    const suggestionBackgroundColour = "var(--neutral-darkest)";
     const suggestionHoverColour = "#a4a4a4";
-    const suggestionBorderColour = "#949494";
+    const suggestionBorderColour = "var(--neutral-black)";
 
     useEffect(() => {
         if (!shouldKeepSuggestionsOpen && showSuggestions) {
@@ -36,6 +36,7 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
             }}
         >
             <input
+                style={{ width: "300px", fontFamily: "Oswald, Tahoma, Geneva, Verdana, sans-serif", fontSize: "large" }}
                 placeholder={placeholder}
                 value={value}
                 onChange={(e) => {
@@ -59,6 +60,8 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
                         backgroundColor: suggestionBackgroundColour,
                         border: `1px solid ${suggestionBorderColour}`,
                         zIndex: "1",
+                        fontFamily: "Oswald, Tahoma, Geneva, Verdana, sans-serif",
+                        width: "100%",
                     }}
                     onMouseEnter={() => setShouldKeepSuggestionsOpen(true)}
                     onMouseLeave={() => setShouldKeepSuggestionsOpen(false)}
@@ -70,6 +73,9 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
                                 id={suggestion.value}
                                 style={{
                                     border: `1px solid ${suggestionBorderColour}`,
+                                    paddingTop: "5px",
+                                    paddingBottom: "5px",
+                                    width: "100%",
                                 }}
                                 onClick={() => {
                                     setValue(suggestion.value);

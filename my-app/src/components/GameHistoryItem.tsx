@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import "../styles/GameHistoryItem.css";
-import { GameData, Lifeline, TagData, getReleaseYearString } from "./GameScreen";
+import { GameData, Lifeline, Player, TagData, getReleaseYearString } from "./GameScreen";
 
 interface IGameHistoryItemProps {
     id: string;
@@ -8,13 +8,14 @@ interface IGameHistoryItemProps {
     tagData: { [id: string]: TagData };
     lifelinesUsed: Lifeline[];
     viewDetailsButtonVisible: boolean;
+    player: Player;
 }
 
-const GameHistoryItem = ({ id, data, tagData, lifelinesUsed, viewDetailsButtonVisible }: IGameHistoryItemProps) => {
+const GameHistoryItem = ({ id, data, tagData, lifelinesUsed, viewDetailsButtonVisible, player }: IGameHistoryItemProps) => {
     const [viewDetailsClicked, setViewDetailsClicked] = useState(false);
 
     return (
-        <div className="game-history-item">
+        <div className={`game-history-item ${player === Player.P1 ? "player-one" : "player-two"}`}>
             <div className="game-history-container">
                 {(lifelinesUsed.includes(Lifeline.RevealArt) || viewDetailsClicked) && (
                     <div className="revealed-art-container">
@@ -30,7 +31,7 @@ const GameHistoryItem = ({ id, data, tagData, lifelinesUsed, viewDetailsButtonVi
                             {" "}
                             {data.tag_ids.map((tag) => {
                                 return (
-                                    <div key={tag} className="revealed-tag">
+                                    <div key={tag} className={"revealed-tag"}>
                                         {tagData[tag].name}
                                     </div>
                                 );
@@ -38,14 +39,14 @@ const GameHistoryItem = ({ id, data, tagData, lifelinesUsed, viewDetailsButtonVi
                         </div>
                     )}
                     {viewDetailsButtonVisible && !viewDetailsClicked && !(lifelinesUsed.includes(Lifeline.RevealArt) && lifelinesUsed.includes(Lifeline.RevealTags)) && (
-                        <button
+                        <div
                             className="view-details-button"
                             onClick={() => {
                                 setViewDetailsClicked(true);
                             }}
                         >
                             View Details
-                        </button>
+                        </div>
                     )}
                 </div>
             </div>

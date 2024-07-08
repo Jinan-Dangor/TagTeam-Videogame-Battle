@@ -5,11 +5,19 @@
     height: auto;
     font-family: Oswald, Tahoma, Geneva, Verdana, sans-serif;
     font-weight: 400;
-    background-color: grey;
-    border-width: 5px;
-    border-color: black;
-    border-style: solid;
+    border-style: none;
     border-radius: 10px;
+    padding: 5px;
+}
+
+.game-history-item.player-one {
+    background-color: var(--primary-panel);
+    box-shadow: var(--primary-panel-shadow) 0px 0px 5px 4px inset;
+}
+
+.game-history-item.player-two {
+    background-color: var(--secondary-panel);
+    box-shadow: var(--secondary-panel-shadow) 0px 0px 5px 4px inset;
 }
 
 .game-history-item .game-history-container {
@@ -64,16 +72,31 @@
     font-size: small;
     display: inline-block;
     height: 20px;
-    background-color: black;
     color: white;
     border-radius: 3px;
     margin: 1px;
     padding: 1px;
 }
 
+.game-history-item.player-one .revealed-tags .revealed-tag {
+    background-color: var(--primary-tag);
+}
+
+.game-history-item.player-two .revealed-tags .revealed-tag {
+    background-color: var(--secondary-tag);
+}
+
 .game-history-item .game-details .view-details-button {
     width: 100px;
     align-self: center;
+}
+
+.game-history-item.player-one .game-details .view-details-button:hover {
+    color: var(--neutral-lightest);
+}
+
+.game-history-item.player-two .game-details .view-details-button:hover {
+    color: var(--neutral-lightest);
 }
 
 @keyframes slide-out {

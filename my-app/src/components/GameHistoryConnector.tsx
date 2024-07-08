@@ -1,10 +1,13 @@
 import React from "react";
 import "../styles/GameHistoryConnector.css";
+import { Player } from "./GameScreen";
 
-interface IGameHistoryConnectorProps {}
+interface IGameHistoryConnectorProps {
+    player: Player;
+}
 
-const GameHistoryConnector = ({}: IGameHistoryConnectorProps) => {
-    return <div className="game-history-connector" />;
+const GameHistoryConnector = ({ player }: IGameHistoryConnectorProps) => {
+    return <div className={`game-history-connector ${player === Player.P1 ? "player-one" : "player-two"}`} />;
 };
 
 export default GameHistoryConnector;

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import "../styles/LifelineButtons.css";
 import { Lifeline, Player } from "./GameScreen";
 
 interface ILifelineButtonsProps {
-    alignment: "right" | "left";
     lifelinesUsed: Map<Player, Lifeline[]>;
     currentPlayer: Player;
     onClickRevealArt: () => void;
@@ -10,23 +10,30 @@ interface ILifelineButtonsProps {
     onClickSkip: () => void;
 }
 
-const LifelineButtons = ({ alignment, lifelinesUsed, currentPlayer, onClickRevealArt, onClickRevealTags, onClickSkip }: ILifelineButtonsProps) => {
+const LifelineButtons = ({ lifelinesUsed, currentPlayer, onClickRevealArt, onClickRevealTags, onClickSkip }: ILifelineButtonsProps) => {
     return (
-        <div>
-            <div style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealArt) ? "visible" : "hidden" }}>
-                <button type="button" onClick={onClickRevealArt} style={{ float: alignment }}>
+        <div className="lifeline-buttons">
+            <div
+                className={`lifeline-button-container ${currentPlayer === Player.P1 ? "player-one" : "player-two"}`}
+                style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealArt) ? "visible" : "hidden" }}
+            >
+                <button className="lifeline-button" type="button" onClick={onClickRevealArt}>
                     Use Art Lifeline
                 </button>
-                <br />
             </div>
-            <div style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealTags) ? "visible" : "hidden" }}>
-                <button type="button" onClick={onClickRevealTags} style={{ float: alignment }}>
+            <div
+                className={`lifeline-button-container ${currentPlayer === Player.P1 ? "player-one" : "player-two"}`}
+                style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealTags) ? "visible" : "hidden" }}
+            >
+                <button className="lifeline-button" type="button" onClick={onClickRevealTags}>
                     Use Tag Lifeline
                 </button>
-                <br />
             </div>
-            <div style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.Skip) ? "visible" : "hidden" }}>
-                <button type="button" onClick={onClickSkip} style={{ float: alignment }}>
+            <div
+                className={`lifeline-button-container ${currentPlayer === Player.P1 ? "player-one" : "player-two"}`}
+                style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.Skip) ? "visible" : "hidden" }}
+            >
+                <button className="lifeline-button" type="button" onClick={onClickSkip}>
                     Use Skip Lifeline
                 </button>
             </div>

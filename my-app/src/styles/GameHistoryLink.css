@@ -1,0 +1,9 @@
+.game-history-link {
+    width: 15%;
+    background-color: var(--neutral-panel);
+    box-shadow: var(--neutral-panel-shadow) 0px 0px 5px 4px inset;
+    border-style: none;
+    border-radius: 10px;
+    margin: auto;
+    padding: 5px;
+}

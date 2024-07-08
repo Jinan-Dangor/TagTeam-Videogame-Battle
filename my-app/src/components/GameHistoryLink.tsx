@@ -1,4 +1,5 @@
 import React from "react";
+import "../styles/GameHistoryLink.css";
 import { GameLinkHistoryEntry, MatchType, TagData, unescapeChars } from "./GameScreen";
 
 interface IGameHistoryItemProps {
@@ -16,17 +17,7 @@ const StrikeTicks = ({ numStrikes }: IStrikeTicksProps) => {
 
 const GameHistoryItem = ({ gameLinkHistoryEntry, tagData }: IGameHistoryItemProps) => {
     return (
-        <div
-            style={{
-                borderWidth: "5px",
-                borderColor: "black",
-                borderStyle: "solid",
-                width: "15%",
-                margin: "auto",
-                borderRadius: "10px",
-                backgroundColor: "grey",
-            }}
-        >
+        <div className="game-history-link">
             {(gameLinkHistoryEntry?.match.type === MatchType.Tags || gameLinkHistoryEntry?.match.type === MatchType.Creators) &&
                 (gameLinkHistoryEntry?.match.type === MatchType.Tags
                     ? gameLinkHistoryEntry?.match.tag_ids?.map((tag) => `${unescapeChars(tagData[tag].name)} ${tagData[tag].emoji}`) ?? []

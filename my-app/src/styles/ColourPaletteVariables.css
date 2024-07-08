@@ -1,0 +1,57 @@
+/* These colours are generated and set in ColourPalette.ts */
+/* Any two shades with 3+ shades in between have WCAG AAA contrast, AA for exactly 3 */
+:root {
+    --primary-black: #00030f;
+    --primary-darkest: #001e3b;
+    --primary-dark: #0d416e;
+    --primary-mid: #2266a4;
+    --primary-light: #5d8ec1;
+    --primary-lightest: #93b7dd;
+    --primary-white: #cbe1f8;
+
+    --secondary-black: #030400;
+    --secondary-darkest: #1a2200;
+    --secondary-dark: #394500;
+    --secondary-mid: #5b6c00;
+    --secondary-light: #839350;
+    --secondary-lightest: #adba8a;
+    --secondary-white: #dae2c5;
+
+    --tertiary-black: #060300;
+    --tertiary-darkest: #251d00;
+    --tertiary-dark: #4b3f00;
+    --tertiary-mid: #746300;
+    --tertiary-light: #978b44;
+    --tertiary-lightest: #bdb583;
+    --tertiary-white: #e4dfc1;
+
+    --neutral-black: #050303;
+    --neutral-darkest: #191e24;
+    --neutral-dark: #384049;
+    --neutral-mid: #596571;
+    --neutral-light: #828b95;
+    --neutral-lightest: #adb4bc;
+    --neutral-white: #e3dcde;
+}
+
+/* These values are derived from the base colours */
+:root {
+    --background: var(--neutral-darkest);
+    --primary-panel: var(--primary-light);
+    --primary-panel-shadow: var(--primary-mid);
+    --secondary-panel: var(--secondary-light);
+    --secondary-panel-shadow: var(--secondary-mid);
+    --neutral-panel: var(--neutral-mid);
+    --neutral-panel-shadow: var(--neutral-dark);
+    --text: var(--neutral-white);
+
+    --button: var(--primary-light);
+    --button-shadow: var(--primary-mid);
+    --button-text: var(--neutral-white);
+
+    --primary-tag: var(--primary-dark);
+    --secondary-tag: var(--secondary-dark);
+
+    --primary-connector: var(--primary-dark);
+    --secondary-connector: var(--secondary-dark);
+}

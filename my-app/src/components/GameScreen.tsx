@@ -6,6 +6,7 @@ import GameHistoryConnector from "./GameHistoryConnector";
 import GameHistoryLink from "./GameHistoryLink";
 import TurnTimer from "./TurnTimer";
 import LifelineButtons from "./LifelineButtons";
+import { initializePalette } from "../utilities/ColourPalette";
 
 export type GameData = {
     name: string;
@@ -107,6 +108,7 @@ function simplifySearchTerm(searchTerm: string) {
 }
 
 const TOP_TAG_LIMIT = 5;
+initializePalette();
 
 const GameScreen = () => {
     const [settingMatchSystem, setSettingMatchSystem] = useState(SettingMatchSystem.CalledTags);
@@ -279,10 +281,11 @@ const GameScreen = () => {
                         setErrorText("");
                         switchPlayer();
                         setTimerTimeLeft(timeLimit);
+                        setNameSearchTerm("");
+                        setNewGameId("");
                     } else {
                         setErrorText(`No connections to ${new_game_data.name}${new_game_data.year_text ? ` (${new_game_data.year_text})` : ""}.`);
                     }
-                    setNewGameId("");
                 }
             }
         });
@@ -368,12 +371,62 @@ const GameScreen = () => {
         return match;
     };
 
+    const LifelineButtonsTemplate = (
+        <LifelineButtons
+            lifelinesUsed={lifelinesUsed}
+            currentPlayer={currentPlayer}
+            onClickRevealArt={() => {
+                setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
+                const tempLifelinesUsed = lifelinesUsed;
+                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
+                setLifelinesUsed(tempLifelinesUsed);
+                let currentGame = gameHistory[gameHistory.length - 1];
+                currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
+                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+            }}
+            onClickRevealTags={() => {
+                setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
+                const tempLifelinesUsed = lifelinesUsed;
+                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
+                setLifelinesUsed(tempLifelinesUsed);
+                let currentGame = gameHistory[gameHistory.length - 1];
+                currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
+                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+            }}
+            onClickSkip={() => {
+                if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
+                    setGameIsOver(true);
+                    setGameResult(GameResult.Draw);
+                    setGameHistory([
+                        ...gameHistory.slice(0, gameHistory.length - 1),
+                        {
+                            ...gameHistory[gameHistory.length - 1],
+                            lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
+                        },
+                    ]);
+                    return;
+                }
+                const tempLifelinesUsed = lifelinesUsed;
+                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
+                setLifelinesUsed(tempLifelinesUsed);
+                let currentGame = gameHistory[gameHistory.length - 1];
+                currentGame = { ...currentGame, lifelinesUsed: [] };
+                setGameHistory([...gameHistory, currentGame]);
+                setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
+                setErrorText("");
+                switchPlayer();
+                setTimerTimeLeft(timeLimit);
+            }}
+        />
+    );
+
     return (
         <div className="App">
-            <h1>Singleplayer Battle Test</h1>
+            <h1 style={{ marginTop: "0" }}>Singleplayer Battle Test</h1>
             {!gameStarted && (
                 <>
                     <button
+                        style={{ fontSize: "large" }}
                         onClick={() => {
                             setGameStarted(true);
                             setTimerTimeLeft(timeLimit);
@@ -409,60 +462,10 @@ const GameScreen = () => {
             {gameStarted && !gameIsOver && (
                 <>
                     <div style={{ display: "flex" }}>
-                        <div style={{ width: "40vw" }}>
-                            {currentPlayer === Player.P1 && (
-                                <LifelineButtons
-                                    alignment="right"
-                                    lifelinesUsed={lifelinesUsed}
-                                    currentPlayer={currentPlayer}
-                                    onClickRevealArt={() => {
-                                        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
-                                        const tempLifelinesUsed = lifelinesUsed;
-                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
-                                        setLifelinesUsed(tempLifelinesUsed);
-                                        let currentGame = gameHistory[gameHistory.length - 1];
-                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
-                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
-                                    }}
-                                    onClickRevealTags={() => {
-                                        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
-                                        const tempLifelinesUsed = lifelinesUsed;
-                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
-                                        setLifelinesUsed(tempLifelinesUsed);
-                                        let currentGame = gameHistory[gameHistory.length - 1];
-                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
-                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
-                                    }}
-                                    onClickSkip={() => {
-                                        if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
-                                            setGameIsOver(true);
-                                            setGameResult(GameResult.Draw);
-                                            setGameHistory([
-                                                ...gameHistory.slice(0, gameHistory.length - 1),
-                                                {
-                                                    ...gameHistory[gameHistory.length - 1],
-                                                    lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
-                                                },
-                                            ]);
-                                            return;
-                                        }
-                                        const tempLifelinesUsed = lifelinesUsed;
-                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
-                                        setLifelinesUsed(tempLifelinesUsed);
-                                        let currentGame = gameHistory[gameHistory.length - 1];
-                                        currentGame = { ...currentGame, lifelinesUsed: [] };
-                                        setGameHistory([...gameHistory, currentGame]);
-                                        setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
-                                        setErrorText("");
-                                        switchPlayer();
-                                        setTimerTimeLeft(timeLimit);
-                                    }}
-                                />
-                            )}
-                        </div>
+                        <div style={{ width: "40vw" }}>{currentPlayer === Player.P1 && LifelineButtonsTemplate}</div>
                         <div style={{ width: "30vw" }}>
                             <p>Current Player: {currentPlayer === Player.P1 ? "Player 1" : "Player 2"}</p>
-                            <div>
+                            <div style={{ marginBottom: "5px" }}>
                                 <AutocompleteInput
                                     value={nameSearchTerm}
                                     setValue={(value) => {
@@ -482,6 +485,7 @@ const GameScreen = () => {
                                 />
                                 <button
                                     type="button"
+                                    style={{ width: "125px", padding: "2px", marginLeft: "10px", fontSize: "large" }}
                                     onClick={() => {
                                         if (gameNameSuggestions[0]) {
                                             setNameSearchTerm(gameNameSuggestions[0].name);
@@ -519,6 +523,7 @@ const GameScreen = () => {
                                     />
                                     <button
                                         type="button"
+                                        style={{ width: "125px", padding: "2px", marginLeft: "10px", fontSize: "large" }}
                                         onClick={() => {
                                             if (tagSuggestions[0]) {
                                                 setTagSearchTerm(tagSuggestions[0].name);
@@ -553,57 +558,7 @@ const GameScreen = () => {
                             />
                         </div>
 
-                        <div style={{ width: "40vw" }}>
-                            {currentPlayer === Player.P2 && (
-                                <LifelineButtons
-                                    alignment="left"
-                                    lifelinesUsed={lifelinesUsed}
-                                    currentPlayer={currentPlayer}
-                                    onClickRevealArt={() => {
-                                        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
-                                        const tempLifelinesUsed = lifelinesUsed;
-                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
-                                        setLifelinesUsed(tempLifelinesUsed);
-                                        let currentGame = gameHistory[gameHistory.length - 1];
-                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
-                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
-                                    }}
-                                    onClickRevealTags={() => {
-                                        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
-                                        const tempLifelinesUsed = lifelinesUsed;
-                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
-                                        setLifelinesUsed(tempLifelinesUsed);
-                                        let currentGame = gameHistory[gameHistory.length - 1];
-                                        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
-                                        setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
-                                    }}
-                                    onClickSkip={() => {
-                                        if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
-                                            setGameIsOver(true);
-                                            setGameResult(GameResult.Draw);
-                                            setGameHistory([
-                                                ...gameHistory.slice(0, gameHistory.length - 1),
-                                                {
-                                                    ...gameHistory[gameHistory.length - 1],
-                                                    lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
-                                                },
-                                            ]);
-                                            return;
-                                        }
-                                        const tempLifelinesUsed = lifelinesUsed;
-                                        tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
-                                        setLifelinesUsed(tempLifelinesUsed);
-                                        let currentGame = gameHistory[gameHistory.length - 1];
-                                        currentGame = { ...currentGame, lifelinesUsed: [] };
-                                        setGameHistory([...gameHistory, currentGame]);
-                                        setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
-                                        setErrorText("");
-                                        switchPlayer();
-                                        setTimerTimeLeft(timeLimit);
-                                    }}
-                                />
-                            )}
-                        </div>
+                        <div style={{ width: "40vw" }}>{currentPlayer === Player.P2 && LifelineButtonsTemplate}</div>
                     </div>
                 </>
             )}
@@ -618,23 +573,24 @@ const GameScreen = () => {
             <div style={{ height: "50px" }} />
             {!gameIsOver && errorText !== "" && <p style={{ color: "#f33" }}>{errorText}</p>}
             {gameStarted && gameHistory[0]?.data && (
-                <div>
+                <div style={{ paddingBottom: "100px" }}>
                     {gameHistory
                         .slice(0)
                         .reverse()
                         .map((game, index) => {
                             const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
+                            const gamePlayer = (gameLinkHistory.length - index - 1) % 2 === 0 ? Player.P2 : Player.P1;
                             return (
                                 <div key={`${game.id}-${gameLinkHistory.length - index - 1}`}>
                                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                        <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} viewDetailsButtonVisible={gameIsOver} />
+                                        <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} viewDetailsButtonVisible={gameIsOver} player={gamePlayer} />
                                         <div style={{ width: "35vw" }} />
                                     </div>
                                     {index !== gameHistory.length - 1 && (
                                         <>
-                                            <GameHistoryConnector />
+                                            <GameHistoryConnector player={gamePlayer} />
                                             <GameHistoryLink gameLinkHistoryEntry={gameLinkHistoryEntry} tagData={tagData} />
-                                            <GameHistoryConnector />
+                                            <GameHistoryConnector player={gamePlayer} />
                                         </>
                                     )}
                                 </div>

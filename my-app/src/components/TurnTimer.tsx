@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
+import "../styles/TurnTimer.css";
 
 interface ITurnTimerProps {
     timeLeft: number;
@@ -39,8 +40,8 @@ const TurnTimer = ({ timeLeft, setTimeLeft, isCountingDown, setIsCountingDown, o
     }, [isCountingDown, timeLeft]);
 
     return (
-        <div>
-            <div>{formatTime(timeLeft)}</div>
+        <div className="turn-timer">
+            <div className="time">{formatTime(timeLeft)}</div>
         </div>
     );
 };

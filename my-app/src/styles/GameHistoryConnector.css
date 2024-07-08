@@ -1,9 +1,16 @@
 .game-history-connector {
     width: 5px;
     height: 50px;
-    background-color: darkgreen;
     margin: auto;
     animation: 0.5s ease-out 0s 1 expand;
+}
+
+.game-history-connector.player-one {
+    background-color: var(--primary-connector);
+}
+
+.game-history-connector.player-two {
+    background-color: var(--secondary-connector);
 }
 
 @keyframes expand {

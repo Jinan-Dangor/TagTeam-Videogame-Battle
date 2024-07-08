@@ -170,7 +170,7 @@ const GameScreen = () => {
         if (nameSearchTerm === "") {
             return;
         }
-        fetch(`http://127.0.0.1:3001/?autocomplete_games=${nameSearchTerm}`).then(async (response) => {
+        fetch(`http://127.0.0.1:3001/?autocomplete_games=${encodeURIComponent(nameSearchTerm)}`).then(async (response) => {
             const response_json = await response.json();
             if (response_json.responses[0].success) {
                 const autocomplete_data = response_json.responses[0];

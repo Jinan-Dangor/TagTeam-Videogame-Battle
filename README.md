@@ -19,3 +19,16 @@ Documentation is still being worked on, but in the meantime here's where you can
 **Database of Games**
 <br>
 `server/game_database.json`
+<br>
+
+# Playing the Game Offline
+
+You can currently play the game by running the following in the `/server/` directory:
+<br>
+`node tagteam-server.js`
+<br><br>
+Then running the following in the `/my-app/src/` directory.
+<br>
+`npm start`
+<br><br>
+You can play this with other players in person or over a screen-shared voice call (you're effectively playing a "couch multiplayer" version of the game).

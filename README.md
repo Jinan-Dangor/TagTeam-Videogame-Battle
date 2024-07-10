@@ -36,7 +36,8 @@ Then running the following in the `/my-app/src/` directory:
 
 If you haven't already, you'll need to [install node.js and npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm).
 <br><br>
-`npm start` will run the game, but to properly host it locally `npm install -g serve` and run the following from the `/my-app/` directory:
+`npm start` will run the game, but to properly host it locally run `npm install -g serve` then run the following from the `/my-app/` directory:
+<br>
 `serve -s build`
 <br>
 (This will launch much faster)

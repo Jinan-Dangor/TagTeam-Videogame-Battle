@@ -1,4 +1,3 @@
-import api_key from "./steam_webapi_key.js";
 import SteamUser from "steam-user";
 import { createServer } from "node:http";
 const hostname = "127.0.0.1";
@@ -11,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const game_name_to_ids_file = path.join(__dirname, "game_name_to_ids.json");
 const skipped_ids_file = path.join(__dirname, "skipped_ids.json");
 const game_database_file = path.join(__dirname, "game_database.json");
+const steam_webapi_key_file = path.join(__dirname, "steam_webapi_key.txt");
 
 /*
     Notes for node-steam-user:
@@ -168,9 +168,16 @@ async function retrieve_game_database() {
 
 async function store_game_name_to_ids() {
     let steam_webapi_data = {};
+    let webapi_key = "";
+    if (!fs.existsSync(steam_webapi_key_file)) {
+        console.error(`Steam WebAPI key not found - cannot generate list of IDs. Game will continue as normal if database is present.`);
+        return false;
+    } else {
+        webapi_key = fs.readFileSync(steam_webapi_key_file, { encoding: "utf-8" });
+    }
 
     {
-        const fetch_response = await fetch(`https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${api_key}&have_description_language=english&max_results=50000`).catch(function (err) {
+        const fetch_response = await fetch(`https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${webapi_key}&have_description_language=english&max_results=50000`).catch(function (err) {
             console.log("Unable to fetch -", err);
         });
 
@@ -189,7 +196,7 @@ async function store_game_name_to_ids() {
         console.log(`${games_list.length} games found`);
         const last_appid = steam_webapi_data.last_appid;
         const fetch_response = await fetch(
-            `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${api_key}&have_description_language=english&last_appid=${last_appid}&max_results=50000`
+            `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${webapi_key}&have_description_language=english&last_appid=${last_appid}&max_results=50000`
         ).catch(function (err) {
             console.log("Unable to fetch -", err);
         });

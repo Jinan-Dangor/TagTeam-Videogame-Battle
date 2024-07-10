@@ -23,12 +23,20 @@ Documentation is still being worked on, but in the meantime here's where you can
 
 # Playing the Game Offline
 
-You can currently play the game by running the following in the `/server/` directory:
+Run the game server by running the following in the `/server/` directory:
 <br>
 `node tagteam-server.js`
 <br><br>
-Then running the following in the `/my-app/src/` directory.
+Then running the following in the `/my-app/src/` directory:
 <br>
 `npm start`
+<br>
+
+# Setup
+
+If you haven't already, you'll need to [install node.js and npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm).
 <br><br>
-You can play this with other players in person or over a screen-shared voice call (you're effectively playing a "couch multiplayer" version of the game).
+`npm start` will run the game, but to properly host it locally `npm install -g serve` and run the following from the `/my-app/` directory:
+`serve -s build`
+<br>
+(This will launch much faster)

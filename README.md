@@ -35,6 +35,8 @@ Then running the following in the `/my-app/src/` directory:
 # Setup
 
 If you haven't already, you'll need to [install node.js and npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm).
+<br>
+You'll also want to run `npm install react-scripts --save` to install react-scripts.
 <br><br>
 `npm start` will run the game, but to properly host it locally run `npm install -g serve` then run the following from the `/my-app/` directory:
 <br>

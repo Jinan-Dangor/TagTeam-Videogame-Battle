@@ -593,7 +593,7 @@ const GameScreen = () => {
                                             viewDetailsButtonVisible={gameIsOver}
                                             player={gamePlayer}
                                         />
-                                        <div style={{ width: "33.25vw" }} />
+                                        <div style={{ width: "33.75vw" }} />
                                     </div>
                                     {index !== gameHistory.length - 1 && (
                                         <>

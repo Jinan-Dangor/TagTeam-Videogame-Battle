@@ -28,7 +28,7 @@
     min-height: 125px;
 }
 
-.game-history-item .game-history-container .game-details,
+.game-history-item .game-details,
 .game-history-item .revealed-art {
     flex-grow: 1;
     flex-shrink: 1;
@@ -36,7 +36,7 @@
 }
 
 .game-history-item .revealed-art {
-    height: 110px;
+    height: 115px;
     border-radius: 10px;
     margin: 5px;
 }
@@ -46,6 +46,8 @@
 }
 
 .game-history-item .revealed-art-container {
+    display: flex;
+    vertical-align: middle;
     overflow: hidden;
     animation: 1s ease-in 0s 1 slide-out;
 }
@@ -56,7 +58,7 @@
     height: auto;
     width: 30vw;
     vertical-align: middle;
-    margin: 1vw;
+    margin: 0.5vw;
 }
 
 .game-history-item .game-counter {

@@ -50,6 +50,7 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
                 value={value}
                 onChange={(e) => {
                     onChange(e);
+                    setValue("");
                     if (e.target.value === "") {
                         setShowSuggestions(false);
                     } else {

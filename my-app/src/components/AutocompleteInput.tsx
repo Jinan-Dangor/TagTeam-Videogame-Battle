@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import "../styles/AutocompleteInput.css";
 
 interface IAutocompleteInputProps {
     placeholder?: string;
@@ -15,12 +16,14 @@ type Suggestion = {
     value: string;
 };
 
+const TIME_UNTIL_CLOSE_AFTER_LEAVE_MS = 1000;
+const TIME_UNTIL_CLOSE_AFTER_INACTIVE_MS = 5000;
+
 const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onChange, onSelectSuggestion }: IAutocompleteInputProps) => {
     const [shouldKeepSuggestionsOpen, setShouldKeepSuggestionsOpen] = useState(false);
+    const [leaveTimeoutId, setLeaveTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
+    const [inactiveTimeoutId, setInactiveTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
-    const suggestionBackgroundColour = "var(--neutral-darkest)";
-    const suggestionHoverColour = "#a4a4a4";
-    const suggestionBorderColour = "var(--neutral-black)";
 
     useEffect(() => {
         if (!shouldKeepSuggestionsOpen && showSuggestions) {
@@ -28,15 +31,21 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
         }
     }, [shouldKeepSuggestionsOpen]);
 
+    const resetInactiveTimer = () => {
+        if (inactiveTimeoutId) {
+            clearTimeout(inactiveTimeoutId);
+        }
+        setInactiveTimeoutId(
+            setTimeout(() => {
+                setShouldKeepSuggestionsOpen(false);
+            }, TIME_UNTIL_CLOSE_AFTER_INACTIVE_MS)
+        );
+    };
+
     return (
-        <span
-            style={{
-                position: "relative",
-                display: "inline-block",
-            }}
-        >
+        <span className="autocomplete-input">
             <input
-                style={{ width: "300px", fontFamily: "Oswald, Tahoma, Geneva, Verdana, sans-serif", fontSize: "large" }}
+                className="input-text"
                 placeholder={placeholder}
                 value={value}
                 onChange={(e) => {
@@ -44,39 +53,44 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
                     if (e.target.value === "") {
                         setShowSuggestions(false);
                     } else {
+                        resetInactiveTimer();
+                        setShouldKeepSuggestionsOpen(true);
                         setShowSuggestions(true);
                     }
                 }}
                 onFocus={(e) => {
                     if (value != "") {
+                        resetInactiveTimer();
+                        setShouldKeepSuggestionsOpen(true);
                         setShowSuggestions(true);
                     }
                 }}
             />
             {showSuggestions && (
                 <div
-                    style={{
-                        position: "absolute",
-                        backgroundColor: suggestionBackgroundColour,
-                        border: `1px solid ${suggestionBorderColour}`,
-                        zIndex: "1",
-                        fontFamily: "Oswald, Tahoma, Geneva, Verdana, sans-serif",
-                        width: "100%",
+                    className="suggestions"
+                    onMouseEnter={() => {
+                        resetInactiveTimer();
+                        setShouldKeepSuggestionsOpen(true);
+                        if (leaveTimeoutId) {
+                            clearTimeout(leaveTimeoutId);
+                            setLeaveTimeoutId(null);
+                        }
                     }}
-                    onMouseEnter={() => setShouldKeepSuggestionsOpen(true)}
-                    onMouseLeave={() => setShouldKeepSuggestionsOpen(false)}
+                    onMouseLeave={() => {
+                        setLeaveTimeoutId(
+                            setTimeout(() => {
+                                setShouldKeepSuggestionsOpen(false);
+                            }, TIME_UNTIL_CLOSE_AFTER_LEAVE_MS)
+                        );
+                    }}
                 >
                     {suggestions.map((suggestion) => {
                         return (
                             <div
                                 key={suggestion.value}
                                 id={suggestion.value}
-                                style={{
-                                    border: `1px solid ${suggestionBorderColour}`,
-                                    paddingTop: "5px",
-                                    paddingBottom: "5px",
-                                    width: "100%",
-                                }}
+                                className="suggestion"
                                 onClick={() => {
                                     setValue(suggestion.value);
                                     onSelectSuggestion(suggestion.search_term);

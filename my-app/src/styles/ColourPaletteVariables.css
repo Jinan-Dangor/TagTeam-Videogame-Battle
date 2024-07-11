@@ -54,4 +54,8 @@
 
     --primary-connector: var(--primary-dark);
     --secondary-connector: var(--secondary-dark);
+
+    --autocomplete-border: var(--neutral-black);
+    --autocomplete-suggestion: var(--neutral-darkest);
+    --autocomplete-suggestion-hover: var(--neutral-dark);
 }

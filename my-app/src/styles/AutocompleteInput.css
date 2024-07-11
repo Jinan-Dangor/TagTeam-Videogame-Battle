@@ -1,0 +1,30 @@
+.autocomplete-input {
+    position: relative;
+    display: inline-block;
+}
+
+.autocomplete-input .input-text {
+    width: 300px;
+    font-family: Oswald, Tahoma, Geneva, Verdana, sans-serif;
+    font-size: large;
+}
+
+.autocomplete-input .suggestions {
+    position: absolute;
+    background-color: var(--autocomplete-suggestion);
+    border: 1px solid var(--autocomplete-border);
+    z-index: 1;
+    font-family: Oswald, Tahoma, Geneva, Verdana, sans-serif;
+    width: 100%;
+}
+
+.autocomplete-input .suggestions .suggestion {
+    border: 1px solid var(--autocomplete-border);
+    padding-top: 5px;
+    padding-bottom: 5px;
+    width: 100%;
+}
+
+.autocomplete-input .suggestions .suggestion:hover {
+    background-color: var(--autocomplete-suggestion-hover);
+}

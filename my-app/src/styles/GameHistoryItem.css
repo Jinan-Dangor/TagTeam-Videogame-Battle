@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css?family=Oswald");
 
 .game-history-item {
+    position: relative;
     display: inline-block;
     height: auto;
     font-family: Oswald, Tahoma, Geneva, Verdana, sans-serif;
@@ -56,6 +57,11 @@
     width: 30vw;
     vertical-align: middle;
     margin: 5px;
+}
+
+.game-history-item .game-counter {
+    position: absolute;
+    right: 10px;
 }
 
 .game-history-item .game-details .game-title {

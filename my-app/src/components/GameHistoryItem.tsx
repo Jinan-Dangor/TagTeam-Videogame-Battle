@@ -4,6 +4,7 @@ import { GameData, Lifeline, Player, TagData, getReleaseYearString } from "./Gam
 
 interface IGameHistoryItemProps {
     id: string;
+    gameNumber: number;
     data: GameData;
     tagData: { [id: string]: TagData };
     lifelinesUsed: Lifeline[];
@@ -11,11 +12,12 @@ interface IGameHistoryItemProps {
     player: Player;
 }
 
-const GameHistoryItem = ({ id, data, tagData, lifelinesUsed, viewDetailsButtonVisible, player }: IGameHistoryItemProps) => {
+const GameHistoryItem = ({ id, gameNumber, data, tagData, lifelinesUsed, viewDetailsButtonVisible, player }: IGameHistoryItemProps) => {
     const [viewDetailsClicked, setViewDetailsClicked] = useState(false);
 
     return (
         <div className={`game-history-item ${player === Player.P1 ? "player-one" : "player-two"}`}>
+            <div className="game-counter">#{gameNumber}</div>
             <div className="game-history-container">
                 {(lifelinesUsed.includes(Lifeline.RevealArt) || viewDetailsClicked) && (
                     <div className="revealed-art-container">

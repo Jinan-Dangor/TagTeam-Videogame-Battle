@@ -578,12 +578,21 @@ const GameScreen = () => {
                         .slice(0)
                         .reverse()
                         .map((game, index) => {
-                            const gameLinkHistoryEntry = gameLinkHistory[gameLinkHistory.length - index - 1];
+                            const gameNumber = gameLinkHistory.length - index + 1;
+                            const gameLinkHistoryEntry = gameLinkHistory[gameNumber - 2];
                             const gamePlayer = (gameLinkHistory.length - index - 1) % 2 === 0 ? Player.P2 : Player.P1;
                             return (
                                 <div key={`${game.id}-${gameLinkHistory.length - index - 1}`}>
                                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                        <GameHistoryItem id={game.id} data={game.data} tagData={tagData} lifelinesUsed={game.lifelinesUsed} viewDetailsButtonVisible={gameIsOver} player={gamePlayer} />
+                                        <GameHistoryItem
+                                            id={game.id}
+                                            gameNumber={gameNumber}
+                                            data={game.data}
+                                            tagData={tagData}
+                                            lifelinesUsed={game.lifelinesUsed}
+                                            viewDetailsButtonVisible={gameIsOver}
+                                            player={gamePlayer}
+                                        />
                                         <div style={{ width: "35vw" }} />
                                     </div>
                                     {index !== gameHistory.length - 1 && (

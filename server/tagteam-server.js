@@ -1,5 +1,6 @@
 import SteamUser from "steam-user";
 import { createServer } from "node:http";
+import { WebSocketServer, WebSocket } from "ws";
 const hostname = "127.0.0.1";
 const port = 3001;
 
@@ -36,16 +37,196 @@ const steam_webapi_key_file = path.join(__dirname, "steam_webapi_key.txt");
         header_image_url:       https://cdn.akamai.steamstatic.com/steam/apps/${id}/header.jpg
 */
 
-/*
-    Notes about testing:
-    Bioshock Remastered has multiple developers and publishers
-*/
-
 let game_database = {};
 let game_name_to_ids = new Map();
 let skipped_ids = [];
 let expected_num_of_games = 0;
 let READY_TO_RUN = false;
+
+/*
+    Duel format:
+    key: duelId
+    {
+        settings: {             (obj)                       Settings for the duel
+            matchSystem         (string)                    "TopFiveTags" or "CalledTags"
+        }
+        gameStarted             (boolean)                   Has the game started yet?
+        gameIsOver              (boolean)                   Has the game ended yet?
+        gameResult              (string?)                   "P1Win", "P2Win" or "Draw"
+        usedGameIds             (string[])                  List of the game ids already used in this duel
+        tagUsedCount            ([id: string]: number)      How many times each tag has been used
+        creatorUsedCount        ([creator: string]: number) How many times each creator has been used
+        gameHistory: {          (obj[])                     History of each game played this duel
+            id                  (string)                    Game's id
+            data: {             (obj)                       Game's data
+                ...             ('game format' as described above)
+            }
+            lifelinesUsed       (string[])                  Contains "Skip", "RevealTags" and/or "RevealArt"
+        }
+        gameLinkHistory: {      (obj[])                     How each game was linked to the next in this duel
+            match: {            (obj)
+                type            (string)                    "None", "Tags", "Creators", "Skip"
+                tagIds          (string[]?)                 If "Tags", ids of the tags used
+                creators        (string[]?)                 If "Creators", list of creators
+                creatorRolesA   (string[]?)                 If "Creators", list of roles the creator had on first game
+                creatorRolesB   (string[]?)                 If "Creators", list of roles the creator had on second game
+            }
+            counts              (number[])                  How many times each tag/creator has been used so far this game
+        }
+        currentPlayer           (string)                    "P1" or "P2"
+        lifelinesUsed           ((string, string)[])        Map from player to the list of lifelines they've used
+    }
+*/
+
+let activeDuels = {};
+
+const generateDuelKey = () => {
+    const possibleChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM";
+    let key = "key_";
+    let format = "............";
+    for (let i = 0; i < format.length; i++) {
+        if (format[i] === ".") {
+            key += possibleChars.charAt(Math.floor(Math.random() * possibleChars.length));
+        } else {
+            key += format[i];
+        }
+    }
+    return key;
+};
+
+const webSocketServer = new WebSocketServer({ port: 8080 });
+
+webSocketServer.on("connection", function connection(ws) {
+    ws.on("message", function message(data) {
+        const newRequest = JSON.parse(data.toString());
+        ws.send("Connection successful!");
+        ws.send(`Data Received: ${data.toString()}`);
+        if (newRequest.queryType === null) {
+            ws.send(missingParameterErrorResponse("(no queryType provided)", queryId, "queryType"));
+            return;
+        }
+        const queryType = newRequest.queryType;
+        if (newRequest.queryId === null) {
+            ws.send(missingParameterErrorResponse(queryType, "(no queryId provided)", "queryId"));
+            return;
+        }
+        const queryId = newRequest.queryId;
+        console.log(`Received query: ${queryType}`);
+        if (!READY_TO_RUN) {
+            ws.send(errorResponse(queryType, queryId, "Server not yet ready to receive requests."));
+        } else if (queryType === "echo") {
+            if (newRequest.content === null) {
+                ws.send(missingParameterErrorResponse(queryType, queryId, "content"));
+                return;
+            }
+            const content = newRequest.content;
+            ws.send(serverSuccessResponse(queryType, queryId, { content }));
+        } else if (queryType === "game_info") {
+            const target_game_id = query_objects[i].body;
+            const game = game_database[target_game_id];
+            ws.send(serverSuccessResponse(queryType, queryId, game));
+        } else if (queryType === "autocomplete_games") {
+            const search_term = simplify_game_name_search_term(decodeURIComponent(query_objects[i].body));
+            const valid_games = Object.keys(game_database)
+                .filter((id) => simplify_game_name_search_term(game_database[id].name).includes(search_term))
+                .map((id) => {
+                    return {
+                        id,
+                        name: game_database[id].name,
+                        year_text: getReleaseYearString(game_database[id]),
+                        review_percentage: Number(game_database[id].review_percentage),
+                        review_score: Number(game_database[id].review_score),
+                    };
+                })
+                .sort((a, b) => {
+                    const simple_name_a = simplify_game_name_search_term(a.name);
+                    const simple_name_b = simplify_game_name_search_term(b.name);
+                    const score_a = a.review_percentage + 10 * a.review_score;
+                    const starting_mod_a = simple_name_a.startsWith(search_term) ? 1000 : 0;
+                    const perfect_mod_a = simple_name_a == search_term ? 10000 : 0;
+                    const score_b = b.review_percentage + 10 * b.review_score;
+                    const starting_mod_b = simple_name_b.startsWith(search_term) ? 1000 : 0;
+                    const perfect_mod_b = simple_name_b == search_term ? 10000 : 0;
+                    const final_score_a = score_a + starting_mod_a + perfect_mod_a;
+                    const final_score_b = score_b + starting_mod_b + perfect_mod_b;
+                    return final_score_b - final_score_a;
+                })
+                .slice(0, 10);
+            ws.send(serverSuccessResponse(queryType, queryId, { valid_games }));
+        } else if (queryType === "start_game") {
+            let newDuelKey = generateDuelKey();
+            while (Object.keys(activeDuels).includes(newDuelKey)) {
+                newDuelKey = generateDuelKey();
+            }
+            const startingGameId = "440";
+            activeDuels[newDuelKey] = {
+                settings: {
+                    matchSystem: "CalledTags",
+                },
+                gameStarted: false,
+                gameIsOver: false,
+                gameResult: null,
+                usedGameIds: [startingGameId],
+                tagUsedCount: {},
+                creatorUsedCount: {},
+                gameHistory: [
+                    {
+                        id: startingGameId,
+                        data: game_database[startingGameId],
+                        lifelinesUsed: [],
+                    },
+                ],
+                gameLinkHistory: [],
+                currentPlayer: "P1",
+                lifelinesUsed: [
+                    ["P1", []],
+                    ["P2", []],
+                ],
+            };
+            console.log(activeDuels);
+            ws.send(serverSuccessResponse(queryType, queryId, { newDuelKey }));
+        } else if (queryType === "join_game") {
+        } else if (queryType === "turn_started") {
+        } else if (queryType === "make_guess") {
+        } else if (queryType === "use_lifeline") {
+        } else if (queryType === "get_duel_state") {
+            if (newRequest.duelKey === null) {
+                ws.send(missingParameterErrorResponse(queryType, queryId, "duelKey"));
+                return;
+            }
+            const duelKey = newRequest.duelKey;
+            if (!activeDuels[duelKey]) {
+                ws.send(errorResponse(queryType, queryId, `duelKey '${duelKey}' not found.`));
+                return;
+            }
+            ws.send(serverSuccessResponse(queryType, queryId, { ...activeDuels[duelKey] }));
+        } else {
+            ws.send(errorResponse(queryType, queryId, `Query type '${queryType}' not recognised.`));
+        }
+    });
+});
+
+function serverSuccessResponse(queryType, queryId, payload) {
+    return JSON.stringify({
+        queryType,
+        queryId,
+        success: true,
+        ...payload,
+    });
+}
+
+function errorResponse(queryType, queryId, errorMessage) {
+    return JSON.stringify({
+        queryType,
+        queryId,
+        success: false,
+        errorMessage,
+    });
+}
+
+function missingParameterErrorResponse(queryType, queryId, parameter) {
+    return errorResponse(queryType, queryId, `Parameter '${parameter}' missing from request.`);
+}
 
 const server = createServer(async (req, res) => {
     const url_query_parameters = req.url;
@@ -74,11 +255,12 @@ const server = createServer(async (req, res) => {
             });
             continue;
         }
-        if (query_objects[i].type == "game_info") {
+        const queryType = query_objects[i].type;
+        if (queryType === "game_info") {
             const target_game_id = query_objects[i].body;
             const game = game_database[target_game_id];
             response.responses.push({ success: true, ...game });
-        } else if (query_objects[i].type == "autocomplete_games") {
+        } else if (queryType === "autocomplete_games") {
             const search_term = simplify_game_name_search_term(decodeURIComponent(query_objects[i].body));
             const valid_games = Object.keys(game_database)
                 .filter((id) => simplify_game_name_search_term(game_database[id].name).includes(search_term))
@@ -109,6 +291,21 @@ const server = createServer(async (req, res) => {
                 success: true,
                 valid_games,
             });
+        } else if (queryType === "start_game") {
+            let newDuelKey = generateDuelKey();
+            while (Object.keys(activeDuels).includes(newDuelKey)) {
+                newDuelKey = generateDuelKey();
+            }
+            activeDuels[newDuelKey] = { testString: "This is a placeholder test string" };
+            response.responses.push({
+                success: true,
+                newDuelKey,
+            });
+        } else if (queryType === "join_game") {
+        } else if (queryType === "turn_started") {
+        } else if (queryType === "make_guess") {
+        } else if (queryType === "use_lifeline") {
+        } else if (queryType === "current_game_state") {
         } else {
             response.responses.push({
                 success: false,
@@ -317,7 +514,7 @@ async function store_game_database(limit = undefined) {
                     }
                     database[target_game_id] = database_entry;
                 } catch (err) {
-                    console.log(`The following error occured while parsing game with ID ${target_game_id}, skipping.`);
+                    console.log(`The following error occurred while parsing game with ID ${target_game_id}, skipping.`);
                     console.log(err);
                 }
             }

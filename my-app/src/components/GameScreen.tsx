@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import tags from "../scripts/scrapedTags.json";
 import AutocompleteInput from "./AutocompleteInput";
 import GameHistoryItem from "./GameHistoryItem";
@@ -44,6 +44,22 @@ export enum MatchType {
     Skip,
 }
 
+const StrToMatchType = (s: string): MatchType => {
+    switch (s) {
+        case "None":
+            return MatchType.None;
+        case "Tags":
+            return MatchType.Tags;
+        case "Creators":
+            return MatchType.Creators;
+        case "Skip":
+            return MatchType.Skip;
+        default:
+            console.error(`Attempting to convert invalid string ${s} into a MatchType enum.`);
+            return MatchType.None;
+    }
+};
+
 type MatchData = {
     type: MatchType;
     tag_ids?: string[];
@@ -64,6 +80,20 @@ export enum Lifeline {
     RevealArt,
 }
 
+const StrToLifeline = (s: string): Lifeline => {
+    switch (s) {
+        case "Skip":
+            return Lifeline.Skip;
+        case "RevealTags":
+            return Lifeline.RevealTags;
+        case "RevealArt":
+            return Lifeline.RevealArt;
+        default:
+            console.error(`Attempting to convert invalid string ${s} into a Lifeline enum.`);
+            return Lifeline.Skip;
+    }
+};
+
 export type GameLinkHistoryEntry = {
     match: MatchData;
     counts: number[];
@@ -74,16 +104,54 @@ export enum Player {
     P2,
 }
 
+const StrToPlayer = (s: string): Player => {
+    switch (s) {
+        case "P1":
+            return Player.P1;
+        case "P2":
+            return Player.P2;
+        default:
+            console.error(`Attempting to convert invalid string ${s} into a Player enum.`);
+            return Player.P1;
+    }
+};
+
 enum GameResult {
     P1Win,
     P2Win,
     Draw,
 }
 
+const StrToGameResult = (s: string): GameResult => {
+    switch (s) {
+        case "P1Win":
+            return GameResult.P1Win;
+        case "P2Win":
+            return GameResult.P2Win;
+        case "Draw":
+            return GameResult.Draw;
+        default:
+            console.error(`Attempting to convert invalid string ${s} into a GameResult enum.`);
+            return GameResult.Draw;
+    }
+};
+
 enum SettingMatchSystem {
     TopFiveTags,
     CalledTags,
 }
+
+const StrToSettingMatchSystem = (s: string) => {
+    switch (s) {
+        case "TopFiveTags":
+            return SettingMatchSystem.TopFiveTags;
+        case "CalledTags":
+            return SettingMatchSystem.CalledTags;
+        default:
+            console.error(`Attempting to convert invalid string ${s} into a SettingMatchSystem enum.`);
+            return SettingMatchSystem.CalledTags;
+    }
+};
 
 export function unescapeChars(str: string) {
     return new DOMParser().parseFromString(str, "text/html").documentElement.textContent;
@@ -111,7 +179,13 @@ const TOP_TAG_LIMIT = 5;
 initializePalette();
 
 const GameScreen = () => {
+    const outgoingApiCalls = useRef<string[]>([]);
+
+    const [duelKey, setDuelKey] = useState<string | null>(null);
     const [settingMatchSystem, setSettingMatchSystem] = useState(SettingMatchSystem.CalledTags);
+    const [gameStarted, setGameStarted] = useState(false);
+    const [gameIsOver, setGameIsOver] = useState(false);
+    const [gameResult, setGameResult] = useState<GameResult | null>(null);
     const [usedGameIds, setUsedGameIds] = useState(["440"]);
     const [tagUsedCount, setTagUsedCount] = useState<{
         [id: string]: number;
@@ -119,16 +193,23 @@ const GameScreen = () => {
     const [creatorUsedCount, setCreatorUsedCount] = useState<{
         [creator: string]: number;
     }>({});
+    const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
+    const [gameLinkHistory, setGameLinkHistory] = useState<GameLinkHistoryEntry[]>([]);
+    const [currentPlayer, setCurrentPlayer] = useState(Player.P1);
+    const [lifelinesUsed, setLifelinesUsed] = useState<Map<Player, Lifeline[]>>(
+        new Map<Player, Lifeline[]>([
+            [Player.P1, []],
+            [Player.P2, []],
+        ])
+    );
+
     const [errorText, setErrorText] = useState("");
     const [newGameId, setNewGameId] = useState("");
     const [nameSearchTerm, setNameSearchTerm] = useState("");
     const [tagSearchTerm, setTagSearchTerm] = useState("");
     const [selectedTag, setSelectedTag] = useState<string | null>(null);
     const [tagSuggestions, setTagSuggestions] = useState<TagAutocompleteData[]>([]);
-    const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
-    const [gameLinkHistory, setGameLinkHistory] = useState<GameLinkHistoryEntry[]>([]);
     const [gameNameSuggestions, setGameNameSuggestions] = useState<GameNameAutocompleteData[]>([]);
-    const [currentPlayer, setCurrentPlayer] = useState(Player.P1);
     const switchPlayer = () => {
         if (currentPlayer === Player.P1) {
             setCurrentPlayer(Player.P2);
@@ -136,34 +217,126 @@ const GameScreen = () => {
             setCurrentPlayer(Player.P1);
         }
     };
-    const [lifelinesUsed, setLifelinesUsed] = useState<Map<Player, Lifeline[]>>(
-        new Map<Player, Lifeline[]>([
-            [Player.P1, []],
-            [Player.P2, []],
-        ])
-    );
-    const [gameStarted, setGameStarted] = useState(false);
     const [timerActive, setTimerActive] = useState(false);
     const [timeLimit, setTimeLimit] = useState(60000);
     const [lifelineTimeBonus, setLifelineTimeBonus] = useState(20000);
     const [timerTimeLeft, setTimerTimeLeft] = useState(timeLimit);
-    const [gameIsOver, setGameIsOver] = useState(false);
-    const [gameResult, setGameResult] = useState<GameResult | null>(null);
     let tagData: { [id: string]: TagData } = {};
     tags.forEach((tag) => (tagData[tag.ID] = { name: tag.name, emoji: tag.emoji }));
 
-    useEffect(() => {
-        const firstGameId = "440";
-        if (gameHistory.length > 0) {
-            return;
-        }
-        fetch(`http://127.0.0.1:3001/?game_info=${firstGameId}`).then(async (response) => {
-            const response_json = await response.json();
-            if (response_json.responses[0].success) {
-                const first_game_data = response_json.responses[0];
-                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), { id: firstGameId, data: first_game_data, lifelinesUsed: [] }]);
+    const generateApiKey = () => {
+        const possibleChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM";
+        let key = "key_";
+        let format = "............";
+        for (let i = 0; i < format.length; i++) {
+            if (format[i] === ".") {
+                key += possibleChars.charAt(Math.floor(Math.random() * possibleChars.length));
+            } else {
+                key += format[i];
             }
-        });
+        }
+        if (outgoingApiCalls.current.includes(key)) {
+            key = generateApiKey();
+        }
+        return key;
+    };
+
+    const sendApiMessage = (ss: WebSocket, queryType: string, payload: any) => {
+        const queryId = generateApiKey();
+        outgoingApiCalls.current.push(queryId);
+        ss.send(JSON.stringify({ queryType, queryId, ...payload }));
+    };
+
+    useEffect(() => {
+        const serverSocket = new WebSocket("ws://localhost:8080");
+        serverSocket.onopen = (event) => {
+            console.log(`Client connected to web socket server successfully!`);
+            sendApiMessage(serverSocket, "echo", { content: "Test message" });
+            sendApiMessage(serverSocket, "start_game", {});
+        };
+
+        serverSocket.onmessage = (event) => {
+            let apiMessage: any = undefined;
+            try {
+                apiMessage = JSON.parse(event.data);
+            } catch {
+                console.error(`Non-JSON server response detected: ${event.data}`);
+                return;
+            }
+            if (!apiMessage.queryType) {
+                console.error(`API call does not have a queryType:`);
+                console.error(apiMessage);
+                return;
+            }
+            if (!outgoingApiCalls.current.includes(apiMessage.queryId)) {
+                console.error(`API call does not correspond to a known id:`);
+                console.error(apiMessage);
+                return;
+            }
+            if (!apiMessage.success) {
+                console.error(`API call failed:`);
+                console.error(apiMessage);
+                return;
+            }
+            const queryType = apiMessage.queryType;
+            const queryId = apiMessage.queryId;
+            outgoingApiCalls.current.splice(outgoingApiCalls.current.indexOf(queryId), 1);
+            if (queryType === "echo") {
+            } else if (queryType === "game_info") {
+            } else if (queryType === "autocomplete_games") {
+            } else if (queryType === "start_game") {
+                if (apiMessage.success && apiMessage.newDuelKey) {
+                    console.log(`Game started successfully! Duel Key: ${apiMessage.newDuelKey}`);
+                } else {
+                }
+                setDuelKey(apiMessage.newDuelKey);
+                sendApiMessage(serverSocket, "get_duel_state", { duelKey: apiMessage.newDuelKey });
+            } else if (queryType === "join_game") {
+            } else if (queryType === "turn_started") {
+            } else if (queryType === "make_guess") {
+            } else if (queryType === "use_lifeline") {
+            } else if (queryType === "get_duel_state") {
+                const necessaryFields = [
+                    "settings",
+                    "gameStarted",
+                    "gameIsOver",
+                    "usedGameIds",
+                    "tagUsedCount",
+                    "creatorUsedCount",
+                    "gameHistory",
+                    "gameLinkHistory",
+                    "currentPlayer",
+                    "lifelinesUsed",
+                ];
+                for (let i = 0; i < necessaryFields.length; i++) {
+                    if (apiMessage[necessaryFields[i]] === null) {
+                        console.error(`Following API call is missing field ${necessaryFields[i]}:`);
+                        console.error(apiMessage);
+                        return;
+                    }
+                }
+                setSettingMatchSystem(StrToSettingMatchSystem(apiMessage.settings.matchSystem));
+                setGameStarted(apiMessage.gameStarted);
+                setGameIsOver(apiMessage.gameIsOver);
+                if (apiMessage.gameResult) {
+                    setGameResult(StrToGameResult(apiMessage.gameResult));
+                }
+                setUsedGameIds(apiMessage.usedGameIds);
+                setTagUsedCount(apiMessage.tagUsedCount);
+                setCreatorUsedCount(apiMessage.creatorUsedCount);
+                setGameHistory(apiMessage.gameHistory);
+                setGameLinkHistory(apiMessage.gameLinkHistory);
+                setCurrentPlayer(StrToPlayer(apiMessage.currentPlayer));
+                const lifelinesUsedConverted = apiMessage.lifelinesUsed.map((lifelineEntry: any) => [StrToPlayer(lifelineEntry[0]), lifelineEntry[1].map((lifeline) => StrToLifeline(lifeline))]);
+                setLifelinesUsed(new Map<Player, Lifeline[]>(lifelinesUsedConverted));
+            } else {
+                console.error(`API call doesn't correspond to a known queryType: ${apiMessage.toString()}`);
+            }
+        };
+
+        return () => {
+            serverSocket.close();
+        };
     }, []);
 
     useEffect(() => {
@@ -225,10 +398,8 @@ const GameScreen = () => {
                 if (gameHistory[gameHistory.length - 1].data) {
                     let matchResult;
                     if (settingMatchSystem === SettingMatchSystem.TopFiveTags) {
-                        console.log(`Comparing as if top 5`);
                         matchResult = compareGameTopTags(gameHistory[gameHistory.length - 1].data, new_game_data);
                     } else if (settingMatchSystem === SettingMatchSystem.CalledTags) {
-                        console.log(`Comparing with called tag`);
                         matchResult = compareGameCalledTag(gameHistory[gameHistory.length - 1].data, new_game_data, selectedTag);
                     } else {
                         console.error("Setting 'Match System' not set to known value.");

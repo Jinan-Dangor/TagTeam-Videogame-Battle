@@ -99,8 +99,8 @@ const webSocketServer = new WebSocketServer({ port: 8080 });
 webSocketServer.on("connection", function connection(ws) {
     ws.on("message", function message(data) {
         const newRequest = JSON.parse(data.toString());
-        ws.send("Connection successful!");
-        ws.send(`Data Received: ${data.toString()}`);
+        //ws.send("Connection successful!");
+        //ws.send(`Data Received: ${data.toString()}`);
         if (newRequest.queryType === null) {
             ws.send(missingParameterErrorResponse("(no queryType provided)", queryId, "queryType"));
             return;
@@ -126,7 +126,7 @@ webSocketServer.on("connection", function connection(ws) {
             const game = game_database[target_game_id];
             ws.send(serverSuccessResponse(queryType, queryId, game));
         } else if (queryType === "autocomplete_games") {
-            const search_term = simplify_game_name_search_term(decodeURIComponent(query_objects[i].body));
+            const search_term = simplify_game_name_search_term(decodeURIComponent(newRequest.searchTerm));
             const valid_games = Object.keys(game_database)
                 .filter((id) => simplify_game_name_search_term(game_database[id].name).includes(search_term))
                 .map((id) => {
@@ -152,7 +152,7 @@ webSocketServer.on("connection", function connection(ws) {
                     return final_score_b - final_score_a;
                 })
                 .slice(0, 10);
-            ws.send(serverSuccessResponse(queryType, queryId, { valid_games }));
+            ws.send(serverSuccessResponse(queryType, queryId, { searchResults: valid_games }));
         } else if (queryType === "start_game") {
             let newDuelKey = generateDuelKey();
             while (Object.keys(activeDuels).includes(newDuelKey)) {

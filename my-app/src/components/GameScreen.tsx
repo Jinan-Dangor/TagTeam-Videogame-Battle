@@ -179,7 +179,9 @@ const TOP_TAG_LIMIT = 5;
 initializePalette();
 
 const GameScreen = () => {
+    const serverSocket = useRef<WebSocket>();
     const outgoingApiCalls = useRef<string[]>([]);
+    const latestGameAutocompleteId = useRef<string>();
 
     const [duelKey, setDuelKey] = useState<string | null>(null);
     const [settingMatchSystem, setSettingMatchSystem] = useState(SettingMatchSystem.CalledTags);
@@ -241,21 +243,24 @@ const GameScreen = () => {
         return key;
     };
 
-    const sendApiMessage = (ss: WebSocket, queryType: string, payload: any) => {
+    const sendApiMessage = (queryType: string, payload: any) => {
         const queryId = generateApiKey();
         outgoingApiCalls.current.push(queryId);
-        ss.send(JSON.stringify({ queryType, queryId, ...payload }));
+        serverSocket.current?.send(JSON.stringify({ queryType, queryId, ...payload }));
+        return queryId;
     };
 
     useEffect(() => {
-        const serverSocket = new WebSocket("ws://localhost:8080");
-        serverSocket.onopen = (event) => {
+        serverSocket.current = new WebSocket("ws://localhost:8080");
+        const newSocket = serverSocket.current;
+
+        serverSocket.current.onopen = (event) => {
             console.log(`Client connected to web socket server successfully!`);
-            sendApiMessage(serverSocket, "echo", { content: "Test message" });
-            sendApiMessage(serverSocket, "start_game", {});
+            sendApiMessage("echo", { content: "Test message" });
+            sendApiMessage("start_game", {});
         };
 
-        serverSocket.onmessage = (event) => {
+        serverSocket.current.onmessage = (event) => {
             let apiMessage: any = undefined;
             try {
                 apiMessage = JSON.parse(event.data);
@@ -284,13 +289,20 @@ const GameScreen = () => {
             if (queryType === "echo") {
             } else if (queryType === "game_info") {
             } else if (queryType === "autocomplete_games") {
+                if (!apiMessage.searchResults) {
+                    console.error(`autocomplete_games not supplied with searchResults.`);
+                    return;
+                }
+                if (queryId === latestGameAutocompleteId.current) {
+                    setGameNameSuggestions(apiMessage.searchResults);
+                }
             } else if (queryType === "start_game") {
                 if (apiMessage.success && apiMessage.newDuelKey) {
                     console.log(`Game started successfully! Duel Key: ${apiMessage.newDuelKey}`);
                 } else {
                 }
                 setDuelKey(apiMessage.newDuelKey);
-                sendApiMessage(serverSocket, "get_duel_state", { duelKey: apiMessage.newDuelKey });
+                sendApiMessage("get_duel_state", { duelKey: apiMessage.newDuelKey });
             } else if (queryType === "join_game") {
             } else if (queryType === "turn_started") {
             } else if (queryType === "make_guess") {
@@ -334,22 +346,16 @@ const GameScreen = () => {
             }
         };
 
-        return () => {
-            serverSocket.close();
-        };
+        return () => newSocket.close();
     }, []);
 
     useEffect(() => {
         if (nameSearchTerm === "") {
+            setGameNameSuggestions([]);
+            latestGameAutocompleteId.current = undefined;
             return;
         }
-        fetch(`http://127.0.0.1:3001/?autocomplete_games=${encodeURIComponent(nameSearchTerm)}`).then(async (response) => {
-            const response_json = await response.json();
-            if (response_json.responses[0].success) {
-                const autocomplete_data = response_json.responses[0];
-                setGameNameSuggestions(autocomplete_data.valid_games);
-            }
-        });
+        latestGameAutocompleteId.current = sendApiMessage("autocomplete_games", { searchTerm: encodeURIComponent(nameSearchTerm) });
     }, [nameSearchTerm]);
 
     useEffect(() => {

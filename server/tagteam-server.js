@@ -122,9 +122,12 @@ webSocketServer.on("connection", function connection(ws) {
             const content = newRequest.content;
             ws.send(serverSuccessResponse(queryType, queryId, { content }));
         } else if (queryType === "game_info") {
-            const target_game_id = query_objects[i].body;
-            const game = game_database[target_game_id];
-            ws.send(serverSuccessResponse(queryType, queryId, game));
+            if (newRequest.gameId === null) {
+                ws.send(missingParameterErrorResponse(queryType, queryId, "gameId"));
+                return;
+            }
+            const game = game_database[newRequest.gameId];
+            ws.send(serverSuccessResponse(queryType, queryId, { gameData: game }));
         } else if (queryType === "autocomplete_games") {
             const search_term = simplify_game_name_search_term(decodeURIComponent(newRequest.searchTerm));
             const valid_games = Object.keys(game_database)

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import tags from "../scripts/scrapedTags.json";
 import AutocompleteInput from "./AutocompleteInput";
 import GameHistoryItem from "./GameHistoryItem";
@@ -185,18 +185,42 @@ const GameScreen = () => {
 
     const [duelKey, setDuelKey] = useState<string | null>(null);
     const [settingMatchSystem, setSettingMatchSystem] = useState(SettingMatchSystem.CalledTags);
+    const settingMatchSystemRef = useRef(settingMatchSystem);
+    useEffect(() => {
+        settingMatchSystemRef.current = settingMatchSystem;
+    }, [settingMatchSystem]);
     const [gameStarted, setGameStarted] = useState(false);
     const [gameIsOver, setGameIsOver] = useState(false);
     const [gameResult, setGameResult] = useState<GameResult | null>(null);
-    const [usedGameIds, setUsedGameIds] = useState(["440"]);
+    const [usedGameIds, setUsedGameIds] = useState<string[]>([]);
+    const usedGameIdsRef = useRef(usedGameIds);
+    useEffect(() => {
+        usedGameIdsRef.current = usedGameIds;
+    }, [usedGameIds]);
     const [tagUsedCount, setTagUsedCount] = useState<{
         [id: string]: number;
     }>({});
+    const tagUsedCountRef = useRef(tagUsedCount);
+    useEffect(() => {
+        tagUsedCountRef.current = tagUsedCount;
+    }, [tagUsedCount]);
     const [creatorUsedCount, setCreatorUsedCount] = useState<{
         [creator: string]: number;
     }>({});
+    const creatorUsedCountRef = useRef(creatorUsedCount);
+    useEffect(() => {
+        creatorUsedCountRef.current = creatorUsedCount;
+    }, [creatorUsedCount]);
     const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
+    const gameHistoryRef = useRef(gameHistory);
+    useEffect(() => {
+        gameHistoryRef.current = gameHistory;
+    }, [gameHistory]);
     const [gameLinkHistory, setGameLinkHistory] = useState<GameLinkHistoryEntry[]>([]);
+    const gameLinkHistoryRef = useRef(gameLinkHistory);
+    useEffect(() => {
+        gameLinkHistoryRef.current = gameLinkHistory;
+    }, [gameLinkHistory]);
     const [currentPlayer, setCurrentPlayer] = useState(Player.P1);
     const [lifelinesUsed, setLifelinesUsed] = useState<Map<Player, Lifeline[]>>(
         new Map<Player, Lifeline[]>([
@@ -210,6 +234,10 @@ const GameScreen = () => {
     const [nameSearchTerm, setNameSearchTerm] = useState("");
     const [tagSearchTerm, setTagSearchTerm] = useState("");
     const [selectedTag, setSelectedTag] = useState<string | null>(null);
+    const selectedTagRef = useRef(selectedTag);
+    useEffect(() => {
+        selectedTagRef.current = selectedTag;
+    }, [selectedTag]);
     const [tagSuggestions, setTagSuggestions] = useState<TagAutocompleteData[]>([]);
     const [gameNameSuggestions, setGameNameSuggestions] = useState<GameNameAutocompleteData[]>([]);
     const switchPlayer = () => {
@@ -220,9 +248,9 @@ const GameScreen = () => {
         }
     };
     const [timerActive, setTimerActive] = useState(false);
-    const [timeLimit, setTimeLimit] = useState(60000);
+    const timeLimit = useRef(60000);
     const [lifelineTimeBonus, setLifelineTimeBonus] = useState(20000);
-    const [timerTimeLeft, setTimerTimeLeft] = useState(timeLimit);
+    const [timerTimeLeft, setTimerTimeLeft] = useState(timeLimit.current);
     let tagData: { [id: string]: TagData } = {};
     tags.forEach((tag) => (tagData[tag.ID] = { name: tag.name, emoji: tag.emoji }));
 
@@ -288,6 +316,83 @@ const GameScreen = () => {
             outgoingApiCalls.current.splice(outgoingApiCalls.current.indexOf(queryId), 1);
             if (queryType === "echo") {
             } else if (queryType === "game_info") {
+                if (!apiMessage.gameData) {
+                    console.error(`gameData absent game_info request response.`);
+                    return;
+                }
+                console.log(apiMessage);
+                const newGameData = apiMessage.gameData;
+                if (usedGameIds.includes(newGameId)) {
+                    setErrorText(`${newGameData.name} has already been played.`);
+                    return;
+                }
+                if (gameHistoryRef.current[gameHistoryRef.current.length - 1].data) {
+                    let matchResult;
+                    if (settingMatchSystemRef.current === SettingMatchSystem.TopFiveTags) {
+                        matchResult = compareGameTopTags(gameHistoryRef.current[gameHistoryRef.current.length - 1].data, newGameData);
+                    } else if (settingMatchSystemRef.current === SettingMatchSystem.CalledTags) {
+                        matchResult = compareGameCalledTag(gameHistoryRef.current[gameHistoryRef.current.length - 1].data, newGameData, selectedTagRef.current);
+                    } else {
+                        console.error("Setting 'Match System' not set to known value.");
+                        return;
+                    }
+                    let newCounts: number[] = [];
+                    if (matchResult.type === MatchType.Tags) {
+                        console.log("Tags Used", tagUsedCountRef.current);
+                        let new_dict: { [id: string]: number } = {};
+                        for (let i = 0; i < (matchResult.tag_ids?.length ?? 0); i++) {
+                            const newTagId = matchResult.tag_ids?.[i] ?? 0;
+                            if (tagUsedCountRef.current[newTagId] >= 3) {
+                                setErrorText(`${tagData[newTagId].name} has already been played 3 times.`);
+                                return;
+                            }
+                            if (newTagId in tagUsedCountRef.current) {
+                                new_dict[newTagId] = tagUsedCountRef.current[newTagId] + 1;
+                                newCounts.push(tagUsedCountRef.current[newTagId] + 1);
+                            } else {
+                                new_dict[newTagId] = 1;
+                                newCounts.push(1);
+                            }
+                        }
+                        setTagUsedCount({ ...tagUsedCountRef.current, ...new_dict });
+                    }
+                    if (matchResult.type === MatchType.Creators) {
+                        console.log("Creators Used", creatorUsedCountRef.current);
+                        let new_dict: { [creator: string]: number } = {};
+                        for (let i = 0; i < (matchResult.creators?.length ?? 0); i++) {
+                            const newCreatorName = matchResult.creators?.[i] ?? 0;
+                            if (creatorUsedCountRef.current[newCreatorName] >= 3) {
+                                setErrorText(`${newCreatorName} has already been played 3 times.`);
+                                return;
+                            }
+                            if (newCreatorName in creatorUsedCountRef.current) {
+                                console.log("It's here!");
+                                new_dict[newCreatorName] = creatorUsedCountRef.current[newCreatorName] + 1;
+                                newCounts.push(creatorUsedCountRef.current[newCreatorName] + 1);
+                            } else {
+                                new_dict[newCreatorName] = 1;
+                                newCounts.push(1);
+                            }
+                        }
+                        console.log("New Dict", new_dict);
+                        setCreatorUsedCount({
+                            ...creatorUsedCountRef.current,
+                            ...new_dict,
+                        });
+                    }
+                    if (matchResult.type !== MatchType.None) {
+                        setGameHistory([...gameHistoryRef.current, { id: newGameId, data: newGameData, lifelinesUsed: [] }]);
+                        setUsedGameIds([...usedGameIdsRef.current, newGameId]);
+                        setGameLinkHistory([...gameLinkHistoryRef.current, { match: matchResult, counts: newCounts }]);
+                        setErrorText("");
+                        switchPlayer();
+                        setTimerTimeLeft(timeLimit.current);
+                        setNameSearchTerm("");
+                        setNewGameId("");
+                    } else {
+                        setErrorText(`No connections to ${newGameData.name}${newGameData.year_text ? ` (${newGameData.year_text})` : ""}.`);
+                    }
+                }
             } else if (queryType === "autocomplete_games") {
                 if (!apiMessage.searchResults) {
                     console.error(`autocomplete_games not supplied with searchResults.`);
@@ -388,85 +493,9 @@ const GameScreen = () => {
 
     useEffect(() => {
         if (newGameId !== "") {
-            searchForGame(newGameId);
+            sendApiMessage("game_info", { gameId: newGameId });
         }
     }, [newGameId, selectedTag]);
-
-    const searchForGame = (id: string) => {
-        fetch(`http://127.0.0.1:3001/?game_info=${id}`).then(async (response) => {
-            const response_json = await response.json();
-            if (response_json.responses[0].success) {
-                const new_game_data = response_json.responses[0];
-                if (usedGameIds.includes(newGameId)) {
-                    setErrorText(`${new_game_data.name} has already been played.`);
-                    return;
-                }
-                if (gameHistory[gameHistory.length - 1].data) {
-                    let matchResult;
-                    if (settingMatchSystem === SettingMatchSystem.TopFiveTags) {
-                        matchResult = compareGameTopTags(gameHistory[gameHistory.length - 1].data, new_game_data);
-                    } else if (settingMatchSystem === SettingMatchSystem.CalledTags) {
-                        matchResult = compareGameCalledTag(gameHistory[gameHistory.length - 1].data, new_game_data, selectedTag);
-                    } else {
-                        console.error("Setting 'Match System' not set to known value.");
-                        return;
-                    }
-                    let newCounts: number[] = [];
-                    if (matchResult.type === MatchType.Tags) {
-                        let new_dict: { [id: string]: number } = {};
-                        for (let i = 0; i < (matchResult.tag_ids?.length ?? 0); i++) {
-                            const new_tag_id = matchResult.tag_ids?.[i] ?? 0;
-                            if (tagUsedCount[new_tag_id] >= 3) {
-                                setErrorText(`${tagData[new_tag_id].name} has already been played 3 times.`);
-                                return;
-                            }
-                            if (new_tag_id in tagUsedCount) {
-                                new_dict[new_tag_id] = tagUsedCount[new_tag_id] + 1;
-                                newCounts.push(tagUsedCount[new_tag_id] + 1);
-                            } else {
-                                new_dict[new_tag_id] = 1;
-                                newCounts.push(1);
-                            }
-                        }
-                        setTagUsedCount({ ...tagUsedCount, ...new_dict });
-                    }
-                    if (matchResult.type === MatchType.Creators) {
-                        let new_dict: { [creator: string]: number } = {};
-                        for (let i = 0; i < (matchResult.creators?.length ?? 0); i++) {
-                            const new_creator_name = matchResult.creators?.[i] ?? 0;
-                            if (creatorUsedCount[new_creator_name] >= 3) {
-                                setErrorText(`${new_creator_name} has already been played 3 times.`);
-                                return;
-                            }
-                            if (new_creator_name in creatorUsedCount) {
-                                new_dict[new_creator_name] = creatorUsedCount[new_creator_name] + 1;
-                                newCounts.push(creatorUsedCount[new_creator_name] + 1);
-                            } else {
-                                new_dict[new_creator_name] = 1;
-                                newCounts.push(1);
-                            }
-                        }
-                        setCreatorUsedCount({
-                            ...creatorUsedCount,
-                            ...new_dict,
-                        });
-                    }
-                    if (matchResult.type !== MatchType.None) {
-                        setGameHistory([...gameHistory, { id: newGameId, data: new_game_data, lifelinesUsed: [] }]);
-                        setUsedGameIds([...usedGameIds, newGameId]);
-                        setGameLinkHistory([...gameLinkHistory, { match: matchResult, counts: newCounts }]);
-                        setErrorText("");
-                        switchPlayer();
-                        setTimerTimeLeft(timeLimit);
-                        setNameSearchTerm("");
-                        setNewGameId("");
-                    } else {
-                        setErrorText(`No connections to ${new_game_data.name}${new_game_data.year_text ? ` (${new_game_data.year_text})` : ""}.`);
-                    }
-                }
-            }
-        });
-    };
 
     const compareGames = (gameA: GameData, gameB: GameData): MatchData => {
         const shared_tags = gameA.tag_ids.filter((tag) => gameB.tag_ids.includes(tag));
@@ -592,7 +621,7 @@ const GameScreen = () => {
                 setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
                 setErrorText("");
                 switchPlayer();
-                setTimerTimeLeft(timeLimit);
+                setTimerTimeLeft(timeLimit.current);
             }}
         />
     );
@@ -606,7 +635,7 @@ const GameScreen = () => {
                         style={{ fontSize: "large" }}
                         onClick={() => {
                             setGameStarted(true);
-                            setTimerTimeLeft(timeLimit);
+                            setTimerTimeLeft(timeLimit.current);
                             setTimerActive(true);
                         }}
                     >

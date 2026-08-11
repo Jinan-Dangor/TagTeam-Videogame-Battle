@@ -1,7 +1,10 @@
 import SteamUser from "steam-user";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
-const hostname = "127.0.0.1";
+// For hosting on same machine
+/*const hostname = "127.0.0.1";
+const port = 3001;*/
+const hostname = "192.168.0.65";
 const port = 3001;
 
 import fs from "node:fs";
@@ -396,7 +399,7 @@ async function store_game_name_to_ids() {
         console.log(`${games_list.length} games found`);
         const last_appid = steam_webapi_data.last_appid;
         const fetch_response = await fetch(
-            `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${webapi_key}&have_description_language=english&last_appid=${last_appid}&max_results=50000`
+            `https://api.steampowered.com/IStoreService/GetAppList/v1/?key=${webapi_key}&have_description_language=english&last_appid=${last_appid}&max_results=50000`,
         ).catch(function (err) {
             console.log("Unable to fetch -", err);
         });

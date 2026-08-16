@@ -4,7 +4,7 @@ import AutocompleteInput from "./AutocompleteInput";
 import GameHistoryItem from "./GameHistoryItem";
 import GameHistoryConnector from "./GameHistoryConnector";
 import GameHistoryLink from "./GameHistoryLink";
-import TurnTimer from "./TurnTimer";
+import TurnTimer, { TimerContext } from "./TurnTimer";
 import LifelineButtons from "./LifelineButtons";
 import { initializePalette } from "../utilities/ColourPalette";
 
@@ -226,7 +226,7 @@ const GameScreen = () => {
         new Map<Player, Lifeline[]>([
             [Player.P1, []],
             [Player.P2, []],
-        ])
+        ]),
     );
 
     const [errorText, setErrorText] = useState("");
@@ -279,7 +279,11 @@ const GameScreen = () => {
     };
 
     useEffect(() => {
-        serverSocket.current = new WebSocket("ws://localhost:8080");
+        // Local: "ws://localhost:8080"
+        // Local network: "ws://192.168.0.65:8080"
+        serverSocket.current = new WebSocket("ws://192.168.0.65:8080");
+        console.log("Yeet version 0.1");
+
         const newSocket = serverSocket.current;
 
         serverSocket.current.onopen = (event) => {
@@ -745,23 +749,25 @@ const GameScreen = () => {
                                     </button>
                                 </div>
                             )}
-                            <TurnTimer
-                                timeLeft={timerTimeLeft}
-                                setTimeLeft={setTimerTimeLeft}
-                                isCountingDown={timerActive}
-                                setIsCountingDown={setTimerActive}
-                                onTimerFinished={() => {
-                                    setGameIsOver(true);
-                                    setGameResult(currentPlayer === Player.P2 ? GameResult.P1Win : GameResult.P2Win);
-                                    setGameHistory([
-                                        ...gameHistory.slice(0, gameHistory.length - 1),
-                                        {
-                                            ...gameHistory[gameHistory.length - 1],
-                                            lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
-                                        },
-                                    ]);
-                                }}
-                            />
+                            <TimerContext.Provider value={{ timeLeft: timerTimeLeft, setTimeLeft: setTimerTimeLeft }}>
+                                <TurnTimer
+                                    timeLeft={timerTimeLeft}
+                                    setTimeLeft={setTimerTimeLeft}
+                                    isCountingDown={timerActive}
+                                    setIsCountingDown={setTimerActive}
+                                    onTimerFinished={() => {
+                                        setGameIsOver(true);
+                                        setGameResult(currentPlayer === Player.P2 ? GameResult.P1Win : GameResult.P2Win);
+                                        setGameHistory([
+                                            ...gameHistory.slice(0, gameHistory.length - 1),
+                                            {
+                                                ...gameHistory[gameHistory.length - 1],
+                                                lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
+                                            },
+                                        ]);
+                                    }}
+                                />
+                            </TimerContext.Provider>
                         </div>
 
                         <div style={{ width: "40vw" }}>{currentPlayer === Player.P2 && LifelineButtonsTemplate}</div>

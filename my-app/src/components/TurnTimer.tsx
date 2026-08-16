@@ -1,5 +1,7 @@
-import React, { useEffect } from "react";
+import React, { createContext, useContext, useEffect } from "react";
 import "../styles/TurnTimer.css";
+
+export const TimerContext = createContext<{ timeLeft: number; setTimeLeft: (t: number) => void }>({ timeLeft: 0, setTimeLeft: (t) => {} });
 
 interface ITurnTimerProps {
     timeLeft: number;
@@ -20,10 +22,12 @@ const formatTime = (timeLeftMs: number) => {
 const INTERVAL_PERIOD = 100;
 
 const TurnTimer = ({ timeLeft, setTimeLeft, isCountingDown, setIsCountingDown, onTimerFinished = () => {} }: ITurnTimerProps) => {
+    const timeContext = useContext(TimerContext);
+
     const updateTime = () => {
-        setTimeLeft(timeLeft - INTERVAL_PERIOD);
-        if (timeLeft <= 0) {
-            setTimeLeft(0);
+        timeContext.setTimeLeft(timeContext.timeLeft - INTERVAL_PERIOD);
+        if (timeContext.timeLeft <= 0) {
+            timeContext.setTimeLeft(0);
             setIsCountingDown(false);
             onTimerFinished();
         }
@@ -37,11 +41,11 @@ const TurnTimer = ({ timeLeft, setTimeLeft, isCountingDown, setIsCountingDown, o
             }, INTERVAL_PERIOD);
         }
         return () => clearInterval(intervalId);
-    }, [isCountingDown, timeLeft]);
+    }, [isCountingDown, timeContext.timeLeft]);
 
     return (
         <div className="turn-timer">
-            <div className="time">{formatTime(timeLeft)}</div>
+            <div className="time">{formatTime(timeContext.timeLeft)}</div>
         </div>
     );
 };

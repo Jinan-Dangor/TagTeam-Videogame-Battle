@@ -97,7 +97,7 @@ const generateDuelKey = () => {
     return key;
 };
 
-const webSocketServer = new WebSocketServer({ port: 8080 });
+const webSocketServer = new WebSocketServer({ port: external_port });
 
 webSocketServer.on("connection", function connection(ws) {
     ws.on("message", function message(data) {

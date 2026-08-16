@@ -4,8 +4,8 @@ import { WebSocketServer, WebSocket } from "ws";
 // For hosting on same machine
 /*const hostname = "127.0.0.1";
 const port = 3001;*/
-const hostname = "192.168.0.65";
-const port = 3001;
+const hostname = "0.0.0.0";
+const port = 3000;
 
 import fs from "node:fs";
 import path from "node:path";

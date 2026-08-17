@@ -282,7 +282,6 @@ const GameScreen = () => {
         // Local: "ws://localhost:8080"
         // Local network: "ws://192.168.0.65:8080"
         serverSocket.current = new WebSocket("ws://192.168.0.65:8080");
-        console.log("Yeet version 0.1");
 
         const newSocket = serverSocket.current;
 
@@ -448,7 +447,7 @@ const GameScreen = () => {
                 setGameHistory(apiMessage.gameHistory);
                 setGameLinkHistory(apiMessage.gameLinkHistory);
                 setCurrentPlayer(StrToPlayer(apiMessage.currentPlayer));
-                const lifelinesUsedConverted = apiMessage.lifelinesUsed.map((lifelineEntry: any) => [StrToPlayer(lifelineEntry[0]), lifelineEntry[1].map((lifeline) => StrToLifeline(lifeline))]);
+                const lifelinesUsedConverted = apiMessage.lifelinesUsed.map((lifelineEntry: any) => [StrToPlayer(lifelineEntry[0]), lifelineEntry[1].map((lifeline: any) => StrToLifeline(lifeline))]);
                 setLifelinesUsed(new Map<Player, Lifeline[]>(lifelinesUsedConverted));
             } else {
                 console.error(`API call doesn't correspond to a known queryType: ${apiMessage.toString()}`);

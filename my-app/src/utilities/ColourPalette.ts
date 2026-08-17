@@ -168,7 +168,7 @@ export function GeneratePaletteColour(colour: OkColour): PaletteColour {
 export function GenerateNeutralPaletteColour(colour: OkColour): PaletteColour {
     const newPaletteColour = GeneratePaletteColour(colour);
     Object.keys(newPaletteColour).forEach((key) => {
-        newPaletteColour[key].C /= 5;
+        newPaletteColour[key as keyof PaletteColour].C /= 5;
     });
     return newPaletteColour;
 }

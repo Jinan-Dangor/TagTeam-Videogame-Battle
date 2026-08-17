@@ -175,20 +175,21 @@ function simplifySearchTerm(searchTerm: string) {
     return searchTerm.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-const TOP_TAG_LIMIT = 5;
 initializePalette();
 
 const GameScreen = () => {
     const serverSocket = useRef<WebSocket>();
     const outgoingApiCalls = useRef<string[]>([]);
     const latestGameAutocompleteId = useRef<string>();
-
+    const [playerId, setPlayerId] = useState<string | null>(null);
     const [duelKey, setDuelKey] = useState<string | null>(null);
     const [settingMatchSystem, setSettingMatchSystem] = useState(SettingMatchSystem.CalledTags);
     const settingMatchSystemRef = useRef(settingMatchSystem);
     useEffect(() => {
         settingMatchSystemRef.current = settingMatchSystem;
     }, [settingMatchSystem]);
+    const [gameConnectedTo, setGameConnectedTo] = useState(false);
+    const [otherPlayerConnected, setOtherPlayerConnected] = useState(false);
     const [gameStarted, setGameStarted] = useState(false);
     const [gameIsOver, setGameIsOver] = useState(false);
     const [gameResult, setGameResult] = useState<GameResult | null>(null);
@@ -281,14 +282,13 @@ const GameScreen = () => {
     useEffect(() => {
         // Local: "ws://localhost:8080"
         // Local network: "ws://192.168.0.65:8080"
-        serverSocket.current = new WebSocket("ws://192.168.0.65:8080");
+        serverSocket.current = new WebSocket("ws://localhost:8080");
 
         const newSocket = serverSocket.current;
 
         serverSocket.current.onopen = (event) => {
             console.log(`Client connected to web socket server successfully!`);
-            sendApiMessage("echo", { content: "Test message" });
-            sendApiMessage("start_game", {});
+            sendApiMessage("gen_player_id", {});
         };
 
         serverSocket.current.onmessage = (event) => {
@@ -304,96 +304,61 @@ const GameScreen = () => {
                 console.error(apiMessage);
                 return;
             }
-            if (!outgoingApiCalls.current.includes(apiMessage.queryId)) {
-                console.error(`API call does not correspond to a known id:`);
-                console.error(apiMessage);
-                return;
+            const queryType = apiMessage.queryType;
+            const queryId = apiMessage.queryId;
+            if (outgoingApiCalls.current.includes(apiMessage.queryId)) {
+                outgoingApiCalls.current.splice(outgoingApiCalls.current.indexOf(queryId), 1);
             }
             if (!apiMessage.success) {
                 console.error(`API call failed:`);
                 console.error(apiMessage);
                 return;
             }
-            const queryType = apiMessage.queryType;
-            const queryId = apiMessage.queryId;
-            outgoingApiCalls.current.splice(outgoingApiCalls.current.indexOf(queryId), 1);
             if (queryType === "echo") {
-            } else if (queryType === "game_info") {
-                if (!apiMessage.gameData) {
-                    console.error(`gameData absent game_info request response.`);
+            } else if (queryType === "gen_player_id") {
+                if (!apiMessage.key) {
+                    console.error(`newPlayerKey absent in gen_player_id request response.`);
                     return;
                 }
-                console.log(apiMessage);
-                const newGameData = apiMessage.gameData;
-                if (usedGameIds.includes(newGameId)) {
-                    setErrorText(`${newGameData.name} has already been played.`);
+                setPlayerId(apiMessage.key);
+            } else if (queryType === "make_guess") {
+                if (!apiMessage.guessData) {
+                    console.error(`guessData absent in game_info request response.`);
                     return;
                 }
+                if (apiMessage.errorMessage) {
+                    setErrorText(apiMessage.errorMessage);
+                    return;
+                }
+                const newGuessData = apiMessage.guessData;
+                const guessMatchResult = newGuessData.matchResult;
+                guessMatchResult.type = StrToMatchType(guessMatchResult.type);
+                const guessMatchType = guessMatchResult.type;
+                const guessGameData = newGuessData.gameData;
+                const guessNewCounts = newGuessData.newCounts;
                 if (gameHistoryRef.current[gameHistoryRef.current.length - 1].data) {
-                    let matchResult;
-                    if (settingMatchSystemRef.current === SettingMatchSystem.TopFiveTags) {
-                        matchResult = compareGameTopTags(gameHistoryRef.current[gameHistoryRef.current.length - 1].data, newGameData);
-                    } else if (settingMatchSystemRef.current === SettingMatchSystem.CalledTags) {
-                        matchResult = compareGameCalledTag(gameHistoryRef.current[gameHistoryRef.current.length - 1].data, newGameData, selectedTagRef.current);
-                    } else {
-                        console.error("Setting 'Match System' not set to known value.");
-                        return;
+                    if (guessMatchType === MatchType.Tags) {
+                        const guessNewDict: { [id: string]: number } = newGuessData.newDict;
+                        setTagUsedCount({ ...tagUsedCountRef.current, ...guessNewDict });
                     }
-                    let newCounts: number[] = [];
-                    if (matchResult.type === MatchType.Tags) {
-                        console.log("Tags Used", tagUsedCountRef.current);
-                        let new_dict: { [id: string]: number } = {};
-                        for (let i = 0; i < (matchResult.tag_ids?.length ?? 0); i++) {
-                            const newTagId = matchResult.tag_ids?.[i] ?? 0;
-                            if (tagUsedCountRef.current[newTagId] >= 3) {
-                                setErrorText(`${tagData[newTagId].name} has already been played 3 times.`);
-                                return;
-                            }
-                            if (newTagId in tagUsedCountRef.current) {
-                                new_dict[newTagId] = tagUsedCountRef.current[newTagId] + 1;
-                                newCounts.push(tagUsedCountRef.current[newTagId] + 1);
-                            } else {
-                                new_dict[newTagId] = 1;
-                                newCounts.push(1);
-                            }
-                        }
-                        setTagUsedCount({ ...tagUsedCountRef.current, ...new_dict });
-                    }
-                    if (matchResult.type === MatchType.Creators) {
-                        console.log("Creators Used", creatorUsedCountRef.current);
-                        let new_dict: { [creator: string]: number } = {};
-                        for (let i = 0; i < (matchResult.creators?.length ?? 0); i++) {
-                            const newCreatorName = matchResult.creators?.[i] ?? 0;
-                            if (creatorUsedCountRef.current[newCreatorName] >= 3) {
-                                setErrorText(`${newCreatorName} has already been played 3 times.`);
-                                return;
-                            }
-                            if (newCreatorName in creatorUsedCountRef.current) {
-                                console.log("It's here!");
-                                new_dict[newCreatorName] = creatorUsedCountRef.current[newCreatorName] + 1;
-                                newCounts.push(creatorUsedCountRef.current[newCreatorName] + 1);
-                            } else {
-                                new_dict[newCreatorName] = 1;
-                                newCounts.push(1);
-                            }
-                        }
-                        console.log("New Dict", new_dict);
+                    if (guessMatchType === MatchType.Creators) {
+                        const guessNewDict: { [creator: string]: number } = newGuessData.newDict;
                         setCreatorUsedCount({
                             ...creatorUsedCountRef.current,
-                            ...new_dict,
+                            ...guessNewDict,
                         });
                     }
-                    if (matchResult.type !== MatchType.None) {
-                        setGameHistory([...gameHistoryRef.current, { id: newGameId, data: newGameData, lifelinesUsed: [] }]);
+                    if (guessMatchType !== MatchType.None) {
+                        setGameHistory([...gameHistoryRef.current, { id: newGameId, data: guessGameData, lifelinesUsed: [] }]);
                         setUsedGameIds([...usedGameIdsRef.current, newGameId]);
-                        setGameLinkHistory([...gameLinkHistoryRef.current, { match: matchResult, counts: newCounts }]);
+                        setGameLinkHistory([...gameLinkHistoryRef.current, { match: guessMatchResult, counts: guessNewCounts }]);
                         setErrorText("");
                         switchPlayer();
                         setTimerTimeLeft(timeLimit.current);
                         setNameSearchTerm("");
                         setNewGameId("");
                     } else {
-                        setErrorText(`No connections to ${newGameData.name}${newGameData.year_text ? ` (${newGameData.year_text})` : ""}.`);
+                        setErrorText(`No connections to ${guessGameData.name}${guessGameData.year_text ? ` (${guessGameData.year_text})` : ""}.`);
                     }
                 }
             } else if (queryType === "autocomplete_games") {
@@ -404,16 +369,34 @@ const GameScreen = () => {
                 if (queryId === latestGameAutocompleteId.current) {
                     setGameNameSuggestions(apiMessage.searchResults);
                 }
-            } else if (queryType === "start_game") {
+            } else if (queryType === "player_joined") {
+                setOtherPlayerConnected(true);
+            } else if (queryType === "player_disconnected") {
+                setOtherPlayerConnected(false);
+            } else if (queryType === "host_game") {
                 if (apiMessage.success && apiMessage.newDuelKey) {
-                    console.log(`Game started successfully! Duel Key: ${apiMessage.newDuelKey}`);
+                    console.log(`Game hosted successfully! Duel Key: ${apiMessage.newDuelKey}`);
                 } else {
+                    console.error(`Game failed to host`);
                 }
                 setDuelKey(apiMessage.newDuelKey);
-                sendApiMessage("get_duel_state", { duelKey: apiMessage.newDuelKey });
+                setGameConnectedTo(true);
+            } else if (queryType === "start_game") {
+                sendApiMessage("get_duel_state", { duelKey: apiMessage.duelKey });
+                setGameStarted(true);
+                setTimerTimeLeft(timeLimit.current);
+                setTimerActive(true);
+                console.log("Somebody started the game!");
             } else if (queryType === "join_game") {
+                if (apiMessage.success && apiMessage.duelKey) {
+                    console.log(`Game joined successfully! Duel Key: ${apiMessage.duelKey}`);
+                } else {
+                    console.error(`Failed to join game`);
+                }
+                setDuelKey(apiMessage.duelKey);
+                setGameConnectedTo(true);
+                setOtherPlayerConnected(true);
             } else if (queryType === "turn_started") {
-            } else if (queryType === "make_guess") {
             } else if (queryType === "use_lifeline") {
             } else if (queryType === "get_duel_state") {
                 const necessaryFields = [
@@ -496,89 +479,14 @@ const GameScreen = () => {
 
     useEffect(() => {
         if (newGameId !== "") {
-            sendApiMessage("game_info", { gameId: newGameId });
+            if (usedGameIds.includes(newGameId)) {
+                setErrorText(`${tagSearchTerm} has already been played.`);
+                return;
+            }
+            console.log(selectedTag);
+            sendApiMessage("make_guess", { duelKey, playerId, gameId: newGameId, selectedTag: selectedTag });
         }
     }, [newGameId, selectedTag]);
-
-    const compareGames = (gameA: GameData, gameB: GameData): MatchData => {
-        const shared_tags = gameA.tag_ids.filter((tag) => gameB.tag_ids.includes(tag));
-        const shared_creators = [...new Set([...gameA.developers, ...gameA.publishers])].filter((creator) => [...new Set([...gameB.developers, ...gameB.publishers])].includes(creator));
-        if (shared_creators.length > 0) {
-            const creator_roles = shared_creators.map((creator) => {
-                const developed_a = gameA.developers.includes(creator);
-                const developed_b = gameB.developers.includes(creator);
-                const published_a = gameA.publishers.includes(creator);
-                const published_b = gameB.publishers.includes(creator);
-                let title_a = "";
-                if (developed_a) {
-                    if (published_a) {
-                        title_a = "Developer & Publisher";
-                    } else {
-                        title_a = "Developer";
-                    }
-                } else {
-                    title_a = "Publisher";
-                }
-                let title_b = "";
-                if (developed_b) {
-                    if (published_b) {
-                        title_b = "Developer & Publisher";
-                    } else {
-                        title_b = "Developer";
-                    }
-                } else {
-                    title_b = "Publisher";
-                }
-                return {
-                    creator,
-                    creator_role_a: title_a,
-                    creator_role_b: title_b,
-                };
-            });
-            return {
-                type: MatchType.Creators,
-                creators: creator_roles.map((creator) => creator.creator),
-                creator_roles_a: creator_roles.map((creator) => creator.creator_role_a),
-                creator_roles_b: creator_roles.map((creator) => creator.creator_role_b),
-            };
-        }
-        if (shared_tags.length > 0) {
-            return { type: MatchType.Tags, tag_ids: shared_tags };
-        }
-        return { type: MatchType.None };
-    };
-
-    const compareGameTopTags = (gameA: GameData, gameB: GameData): MatchData => {
-        const match = compareGames(gameA, gameB);
-        const sharedTags = gameA.tag_ids.slice(0, TOP_TAG_LIMIT).filter((tag) => gameB.tag_ids.slice(0, TOP_TAG_LIMIT).includes(tag));
-        if (match.type === MatchType.Tags) {
-            const hasValidTagMatches = sharedTags.filter((tag) => match.tag_ids?.includes(tag)).length > 0;
-            if (hasValidTagMatches) {
-                match.tag_ids = sharedTags;
-                return match;
-            }
-            const noMatch = { type: MatchType.None };
-            return noMatch;
-        }
-        return match;
-    };
-
-    const compareGameCalledTag = (gameA: GameData, gameB: GameData, calledTag: string | null): MatchData => {
-        const match = compareGames(gameA, gameB);
-        if (match.type === MatchType.Tags) {
-            if (calledTag === null) {
-                const noMatch = { type: MatchType.None };
-                return noMatch;
-            }
-            if (match.tag_ids?.includes(calledTag)) {
-                match.tag_ids = [calledTag];
-                return match;
-            }
-            const noMatch = { type: MatchType.None };
-            return noMatch;
-        }
-        return match;
-    };
 
     const LifelineButtonsTemplate = (
         <LifelineButtons
@@ -631,18 +539,16 @@ const GameScreen = () => {
 
     return (
         <div className="App">
-            <h1 style={{ marginTop: "0" }}>Singleplayer Battle Test</h1>
-            {!gameStarted && (
+            <h1 style={{ marginTop: "0" }}>Multiplayer Steam Chain Test</h1>
+            {!gameStarted && !gameConnectedTo && (
                 <>
                     <button
                         style={{ fontSize: "large" }}
                         onClick={() => {
-                            setGameStarted(true);
-                            setTimerTimeLeft(timeLimit.current);
-                            setTimerActive(true);
+                            sendApiMessage("host_game", { playerId: playerId });
                         }}
                     >
-                        Start Game
+                        Host Game
                     </button>
                     <h2>Settings</h2>
                     <input
@@ -666,6 +572,41 @@ const GameScreen = () => {
                         checked={settingMatchSystem === SettingMatchSystem.TopFiveTags}
                     />
                     <label htmlFor="Top 5 Tags">Match automatically on Top 5 tags</label>
+                    <h2>Join Game</h2>
+                    <input
+                        onChange={(e) => {
+                            setDuelKey(e.target.value);
+                        }}
+                    />
+                    <button
+                        style={{ fontSize: "large" }}
+                        onClick={() => {
+                            console.log(duelKey);
+                            sendApiMessage("join_game", { playerId: playerId, duelKey: duelKey });
+                        }}
+                    >
+                        Join Game
+                    </button>
+                </>
+            )}
+            {!gameStarted && gameConnectedTo && (
+                <>
+                    {!otherPlayerConnected && (
+                        <>
+                            <p>Your game code is: {duelKey}</p>
+                            <p>Waiting for other player...</p>
+                        </>
+                    )}
+                    {otherPlayerConnected && (
+                        <button
+                            style={{ fontSize: "large" }}
+                            onClick={() => {
+                                sendApiMessage("start_game", { playerId: playerId, duelKey: duelKey });
+                            }}
+                        >
+                            Start Game
+                        </button>
+                    )}
                 </>
             )}
             {gameStarted && !gameIsOver && (

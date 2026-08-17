@@ -20,8 +20,8 @@ const GameHistoryItem = ({ gameLinkHistoryEntry, tagData }: IGameHistoryItemProp
         <div className="game-history-link">
             {(gameLinkHistoryEntry?.match.type === MatchType.Tags || gameLinkHistoryEntry?.match.type === MatchType.Creators) &&
                 (gameLinkHistoryEntry?.match.type === MatchType.Tags
-                    ? gameLinkHistoryEntry?.match.tag_ids?.map((tag) => `${unescapeChars(tagData[tag].name)} ${tagData[tag].emoji}`) ?? []
-                    : gameLinkHistoryEntry?.match.creators?.map((creator) => `${creator}`) ?? []
+                    ? (gameLinkHistoryEntry?.match.tag_ids?.map((tag) => `${unescapeChars(tagData[tag].name)} ${tagData[tag].emoji}`) ?? [])
+                    : (gameLinkHistoryEntry?.match.creators?.map((creator) => `${creator}`) ?? [])
                 ).map((line, index) => {
                     return (
                         <div key={index}>

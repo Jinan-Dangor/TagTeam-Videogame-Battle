@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from "ws";
 const port = 3001;*/
 const hostname = "0.0.0.0";
 const port = 3000;
+const external_port = 8080;
 
 import fs from "node:fs";
 import path from "node:path";
@@ -82,8 +83,10 @@ let READY_TO_RUN = false;
 */
 
 let activeDuels = {};
+let activeWebsockets = {};
+let activePlayers = {};
 
-const generateDuelKey = () => {
+const generateUniqueKey = (existingKeys) => {
     const possibleChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM";
     let key = "key_";
     let format = "............";
@@ -93,6 +96,9 @@ const generateDuelKey = () => {
         } else {
             key += format[i];
         }
+    }
+    while (existingKeys.includes(key)) {
+        key = generateUniqueKey();
     }
     return key;
 };
@@ -118,20 +124,29 @@ webSocketServer.on("connection", function connection(ws) {
         if (!READY_TO_RUN) {
             ws.send(errorResponse(queryType, queryId, "Server not yet ready to receive requests."));
         } else if (queryType === "echo") {
-            if (newRequest.content === null) {
-                ws.send(missingParameterErrorResponse(queryType, queryId, "content"));
-                return;
-            }
+            checkForMissingParameters(ws, queryType, queryId, newRequest, ["content"]);
             const content = newRequest.content;
             ws.send(serverSuccessResponse(queryType, queryId, { content }));
+        } else if (queryType === "gen_player_id") {
+            let newPlayerKey = generateUniqueKey(Object.keys(activePlayers));
+            activePlayers[newPlayerKey] = {
+                websocket: ws,
+            };
+            activeWebsockets[ws] = {
+                playerId: newPlayerKey,
+            };
+            console.log(`Number of players: ${Object.keys(activePlayers).length}`);
+            ws.send(serverSuccessResponse(queryType, queryId, { key: newPlayerKey }));
         } else if (queryType === "game_info") {
-            if (newRequest.gameId === null) {
-                ws.send(missingParameterErrorResponse(queryType, queryId, "gameId"));
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["gameId"])) {
                 return;
             }
             const game = game_database[newRequest.gameId];
             ws.send(serverSuccessResponse(queryType, queryId, { gameData: game }));
         } else if (queryType === "autocomplete_games") {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["searchTerm"])) {
+                return;
+            }
             const search_term = simplify_game_name_search_term(decodeURIComponent(newRequest.searchTerm));
             const valid_games = Object.keys(game_database)
                 .filter((id) => simplify_game_name_search_term(game_database[id].name).includes(search_term))
@@ -159,11 +174,11 @@ webSocketServer.on("connection", function connection(ws) {
                 })
                 .slice(0, 10);
             ws.send(serverSuccessResponse(queryType, queryId, { searchResults: valid_games }));
-        } else if (queryType === "start_game") {
-            let newDuelKey = generateDuelKey();
-            while (Object.keys(activeDuels).includes(newDuelKey)) {
-                newDuelKey = generateDuelKey();
+        } else if (queryType === "host_game") {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["playerId"])) {
+                return;
             }
+            let newDuelKey = generateUniqueKey(Object.keys(activeDuels));
             const startingGameId = "440";
             activeDuels[newDuelKey] = {
                 settings: {
@@ -183,21 +198,129 @@ webSocketServer.on("connection", function connection(ws) {
                     },
                 ],
                 gameLinkHistory: [],
+                playerIds: [newRequest.playerId],
                 currentPlayer: "P1",
                 lifelinesUsed: [
                     ["P1", []],
                     ["P2", []],
                 ],
             };
-            console.log(activeDuels);
+            activePlayers[newRequest.playerId].currentDuelId = newDuelKey;
             ws.send(serverSuccessResponse(queryType, queryId, { newDuelKey }));
+        } else if (queryType === "start_game") {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId"])) {
+                return;
+            }
+            const duelKey = newRequest.duelKey;
+            const playerId = newRequest.playerId;
+            if (Object.keys(activeDuels).includes(duelKey)) {
+                activeDuels[duelKey].gameStarted = true;
+                ws.send(serverSuccessResponse(queryType, queryId, { duelKey }));
+                const index = activeDuels[duelKey].playerIds.indexOf(playerId);
+                activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse(queryType, queryId, { duelKey }));
+            } else {
+                ws.send(errorResponse(queryType, queryId, "Duel id not found"));
+            }
         } else if (queryType === "join_game") {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId"])) {
+                return;
+            }
+            const playerId = newRequest.playerId;
+            if (!Object.keys(activePlayers).includes(playerId)) {
+                ws.send(errorResponse(queryType, queryId, "Player id not found, refresh the page"));
+                return;
+            }
+            const duelKey = newRequest.duelKey;
+            if (Object.keys(activeDuels).includes(duelKey)) {
+                if (activeDuels[duelKey].gameStarted) {
+                    ws.send(errorResponse(queryType, queryId, "Game already in progress."));
+                }
+                if (activeDuels[duelKey].playerIds.length > 1) {
+                    ws.send(errorResponse(queryType, queryId, "Game already has two players."));
+                }
+                activeDuels[duelKey].playerIds.push(playerId);
+                activePlayers[playerId].currentDuelId = duelKey;
+                ws.send(serverSuccessResponse(queryType, queryId, { duelKey }));
+                activePlayers[activeDuels[duelKey].playerIds[0]].websocket.send(serverSuccessResponse("player_joined", queryId, {}));
+            } else {
+                ws.send(errorResponse(queryType, queryId, "Duel id not found"));
+            }
         } else if (queryType === "turn_started") {
         } else if (queryType === "make_guess") {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId", "gameId"])) {
+                return;
+            }
+            let matchResult;
+            const duelKey = newRequest.duelKey;
+            const playerId = newRequest.playerId;
+            const index = activeDuels[duelKey].playerIds.indexOf(playerId);
+            const game = game_database[newRequest.gameId];
+            const matchingSystem = activeDuels[duelKey].settings.matchSystem;
+            const duelHistory = activeDuels[duelKey].gameHistory;
+            const latestHistory = duelHistory[duelHistory.length - 1];
+            const tagUsedCount = activeDuels[duelKey].tagUsedCount;
+            const creatorUsedCount = activeDuels[duelKey].creatorUsedCount;
+            const selectedTag = newRequest?.selectedTag;
+            if (matchingSystem === "TopFiveTags") {
+                matchResult = compareGameTopTags(latestHistory.data, game);
+            } else if (matchingSystem === "CalledTags") {
+                matchResult = compareGameCalledTag(latestHistory.data, game, selectedTag);
+            } else {
+                console.error("Setting 'Match System' not set to known value.");
+                return;
+            }
+            let newCounts = [];
+            let newDict;
+            if (matchResult.type === MatchType.Tags) {
+                console.log("Tags Used", tagUsedCount);
+                newDict = {};
+                for (let i = 0; i < (matchResult.tag_ids?.length ?? 0); i++) {
+                    const newTagId = matchResult.tag_ids?.[i] ?? 0;
+                    if (tagUsedCount[newTagId] >= 3) {
+                        ws.send(
+                            serverSuccessResponse(queryType, queryId, {
+                                errorText: `${tagData[newTagId].name} has already been played 3 times.`,
+                            }),
+                        );
+                        return;
+                    }
+                    if (newTagId in tagUsedCount) {
+                        newDict[newTagId] = tagUsedCount[newTagId] + 1;
+                        newCounts.push(tagUsedCount[newTagId] + 1);
+                    } else {
+                        newDict[newTagId] = 1;
+                        newCounts.push(1);
+                    }
+                }
+            }
+            if (matchResult.type === MatchType.Creators) {
+                console.log("Creators Used", creatorUsedCount);
+                newDict = {};
+                for (let i = 0; i < (matchResult.creators?.length ?? 0); i++) {
+                    const newCreatorName = matchResult.creators?.[i] ?? 0;
+                    if (creatorUsedCount[newCreatorName] >= 3) {
+                        ws.send(
+                            serverSuccessResponse(queryType, queryId, {
+                                errorText: `${newCreatorName} has already been played 3 times.`,
+                            }),
+                        );
+                        return;
+                    }
+                    if (newCreatorName in creatorUsedCount) {
+                        console.log("It's here!");
+                        newDict[newCreatorName] = creatorUsedCount[newCreatorName] + 1;
+                        newCounts.push(creatorUsedCount[newCreatorName] + 1);
+                    } else {
+                        newDict[newCreatorName] = 1;
+                        newCounts.push(1);
+                    }
+                }
+            }
+            ws.send(serverSuccessResponse(queryType, queryId, { guessData: { gameData: game, matchResult, newCounts, newDict } }));
+            activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse(queryType, queryId, { guessData: { gameData: game, matchResult, newCounts, newDict } }));
         } else if (queryType === "use_lifeline") {
         } else if (queryType === "get_duel_state") {
-            if (newRequest.duelKey === null) {
-                ws.send(missingParameterErrorResponse(queryType, queryId, "duelKey"));
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey"])) {
                 return;
             }
             const duelKey = newRequest.duelKey;
@@ -209,6 +332,21 @@ webSocketServer.on("connection", function connection(ws) {
         } else {
             ws.send(errorResponse(queryType, queryId, `Query type '${queryType}' not recognised.`));
         }
+    });
+
+    ws.on("close", function disconnect(data) {
+        const playerId = activeWebsockets[ws].playerId;
+        if (activePlayers[playerId].currentDuelId != null) {
+            const duelKey = activePlayers[playerId].currentDuelId;
+            const index = activeDuels[duelKey].playerIds.indexOf(playerId);
+            activeDuels[duelKey].playerIds[index] = "<disconnected>";
+            if (activeDuels[duelKey].playerIds[1 - index] != "<disconnected>") {
+                activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse("player_disconnected", "", {}));
+            } else {
+                delete activeDuels[duelKey];
+            }
+        }
+        delete activePlayers[playerId];
     });
 });
 
@@ -230,10 +368,22 @@ function errorResponse(queryType, queryId, errorMessage) {
     });
 }
 
+function checkForMissingParameters(ws, queryType, queryId, query, parameters) {
+    let missingParametersFound = false;
+    parameters.forEach((p) => {
+        if (query[p] == null) {
+            ws.send(missingParameterErrorResponse(queryType, queryId, p));
+            missingParametersFound = true;
+        }
+    });
+    return !missingParametersFound;
+}
+
 function missingParameterErrorResponse(queryType, queryId, parameter) {
     return errorResponse(queryType, queryId, `Parameter '${parameter}' missing from request.`);
 }
 
+// This may need to be deleted? I don't know if it does anything
 const server = createServer(async (req, res) => {
     const url_query_parameters = req.url;
     const query_strings = url_query_parameters.split("?").slice(1);
@@ -298,9 +448,10 @@ const server = createServer(async (req, res) => {
                 valid_games,
             });
         } else if (queryType === "start_game") {
-            let newDuelKey = generateDuelKey();
+            console.log("Non-socket server is being used");
+            let newDuelKey = generateUniqueKey();
             while (Object.keys(activeDuels).includes(newDuelKey)) {
-                newDuelKey = generateDuelKey();
+                newDuelKey = generateUniqueKey();
             }
             activeDuels[newDuelKey] = { testString: "This is a placeholder test string" };
             response.responses.push({
@@ -572,3 +723,92 @@ function getReleaseYearString(game) {
 function getYear(unix) {
     return new Date(unix * 1000).getFullYear();
 }
+
+// GAMING HELPER FUNCTIONS
+const MatchType = {
+    None: "None",
+    Tags: "Tags",
+    Creators: "Creators",
+    Skip: "Skip",
+};
+
+const compareGames = (gameA, gameB) => {
+    const shared_tags = gameA.tag_ids.filter((tag) => gameB.tag_ids.includes(tag));
+    const shared_creators = [...new Set([...gameA.developers, ...gameA.publishers])].filter((creator) => [...new Set([...gameB.developers, ...gameB.publishers])].includes(creator));
+    if (shared_creators.length > 0) {
+        const creator_roles = shared_creators.map((creator) => {
+            const developed_a = gameA.developers.includes(creator);
+            const developed_b = gameB.developers.includes(creator);
+            const published_a = gameA.publishers.includes(creator);
+            const published_b = gameB.publishers.includes(creator);
+            let title_a = "";
+            if (developed_a) {
+                if (published_a) {
+                    title_a = "Developer & Publisher";
+                } else {
+                    title_a = "Developer";
+                }
+            } else {
+                title_a = "Publisher";
+            }
+            let title_b = "";
+            if (developed_b) {
+                if (published_b) {
+                    title_b = "Developer & Publisher";
+                } else {
+                    title_b = "Developer";
+                }
+            } else {
+                title_b = "Publisher";
+            }
+            return {
+                creator,
+                creator_role_a: title_a,
+                creator_role_b: title_b,
+            };
+        });
+        return {
+            type: MatchType.Creators,
+            creators: creator_roles.map((creator) => creator.creator),
+            creator_roles_a: creator_roles.map((creator) => creator.creator_role_a),
+            creator_roles_b: creator_roles.map((creator) => creator.creator_role_b),
+        };
+    }
+    if (shared_tags.length > 0) {
+        return { type: MatchType.Tags, tag_ids: shared_tags };
+    }
+    return { type: MatchType.None };
+};
+
+const TOP_TAG_LIMIT = 5;
+const compareGameTopTags = (gameA, gameB) => {
+    const match = compareGames(gameA, gameB);
+    const sharedTags = gameA.tag_ids.slice(0, TOP_TAG_LIMIT).filter((tag) => gameB.tag_ids.slice(0, TOP_TAG_LIMIT).includes(tag));
+    if (match.type === MatchType.Tags) {
+        const hasValidTagMatches = sharedTags.filter((tag) => match.tag_ids?.includes(tag)).length > 0;
+        if (hasValidTagMatches) {
+            match.tag_ids = sharedTags;
+            return match;
+        }
+        const noMatch = { type: MatchType.None };
+        return noMatch;
+    }
+    return match;
+};
+
+const compareGameCalledTag = (gameA, gameB, calledTag) => {
+    const match = compareGames(gameA, gameB);
+    if (match.type === MatchType.Tags) {
+        if (calledTag === null) {
+            const noMatch = { type: MatchType.None };
+            return noMatch;
+        }
+        if (match.tag_ids?.includes(calledTag)) {
+            match.tag_ids = [calledTag];
+            return match;
+        }
+        const noMatch = { type: MatchType.None };
+        return noMatch;
+    }
+    return match;
+};

@@ -34,7 +34,7 @@ const TurnTimer = ({ timeLeft, setTimeLeft, isCountingDown, setIsCountingDown, o
     };
 
     useEffect(() => {
-        let intervalId;
+        let intervalId: NodeJS.Timeout;
         if (isCountingDown) {
             intervalId = setInterval(() => {
                 updateTime();

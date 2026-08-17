@@ -104,6 +104,13 @@ const generateUniqueKey = (existingKeys) => {
 };
 
 const webSocketServer = new WebSocketServer({ port: external_port });
+bootUpServer();
+
+async function bootUpServer() {
+    await retrieve_skipped_ids();
+    await retrieve_game_name_to_ids();
+    await retrieve_game_database();
+}
 
 webSocketServer.on("connection", function connection(ws) {
     ws.on("message", function message(data) {
@@ -383,104 +390,8 @@ function missingParameterErrorResponse(queryType, queryId, parameter) {
     return errorResponse(queryType, queryId, `Parameter '${parameter}' missing from request.`);
 }
 
-// This may need to be deleted? I don't know if it does anything
-const server = createServer(async (req, res) => {
-    const url_query_parameters = req.url;
-    const query_strings = url_query_parameters.split("?").slice(1);
-    const query_objects = query_strings.map((str) => {
-        const query_halves = str.split("=");
-        const query_type = query_halves[0];
-        const query_body = query_halves[1];
-        return {
-            type: query_type,
-            body: query_body,
-        };
-    });
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "text/plain");
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-    res.setHeader("Access-Control-Allow-Methods", "GET");
-    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,content-type");
-    res.setHeader("Access-Control-Allow-Credentials", true);
-    let response = { responses: [] };
-    for (let i = 0; i < query_objects.length; i++) {
-        if (!READY_TO_RUN) {
-            response.responses.push({
-                success: false,
-                error: "Server not yet ready to receive requests.",
-            });
-            continue;
-        }
-        const queryType = query_objects[i].type;
-        if (queryType === "game_info") {
-            const target_game_id = query_objects[i].body;
-            const game = game_database[target_game_id];
-            response.responses.push({ success: true, ...game });
-        } else if (queryType === "autocomplete_games") {
-            const search_term = simplify_game_name_search_term(decodeURIComponent(query_objects[i].body));
-            const valid_games = Object.keys(game_database)
-                .filter((id) => simplify_game_name_search_term(game_database[id].name).includes(search_term))
-                .map((id) => {
-                    return {
-                        id,
-                        name: game_database[id].name,
-                        year_text: getReleaseYearString(game_database[id]),
-                        review_percentage: Number(game_database[id].review_percentage),
-                        review_score: Number(game_database[id].review_score),
-                    };
-                })
-                .sort((a, b) => {
-                    const simple_name_a = simplify_game_name_search_term(a.name);
-                    const simple_name_b = simplify_game_name_search_term(b.name);
-                    const score_a = a.review_percentage + 10 * a.review_score;
-                    const starting_mod_a = simple_name_a.startsWith(search_term) ? 1000 : 0;
-                    const perfect_mod_a = simple_name_a == search_term ? 10000 : 0;
-                    const score_b = b.review_percentage + 10 * b.review_score;
-                    const starting_mod_b = simple_name_b.startsWith(search_term) ? 1000 : 0;
-                    const perfect_mod_b = simple_name_b == search_term ? 10000 : 0;
-                    const final_score_a = score_a + starting_mod_a + perfect_mod_a;
-                    const final_score_b = score_b + starting_mod_b + perfect_mod_b;
-                    return final_score_b - final_score_a;
-                })
-                .slice(0, 10);
-            response.responses.push({
-                success: true,
-                valid_games,
-            });
-        } else if (queryType === "start_game") {
-            console.log("Non-socket server is being used");
-            let newDuelKey = generateUniqueKey();
-            while (Object.keys(activeDuels).includes(newDuelKey)) {
-                newDuelKey = generateUniqueKey();
-            }
-            activeDuels[newDuelKey] = { testString: "This is a placeholder test string" };
-            response.responses.push({
-                success: true,
-                newDuelKey,
-            });
-        } else if (queryType === "join_game") {
-        } else if (queryType === "turn_started") {
-        } else if (queryType === "make_guess") {
-        } else if (queryType === "use_lifeline") {
-        } else if (queryType === "current_game_state") {
-        } else {
-            response.responses.push({
-                success: false,
-                error: `Query type '${query_objects[i].type}' not recognised.`,
-            });
-        }
-    }
-    res.end(JSON.stringify(response));
-});
-
-server.listen(port, hostname, async () => {
-    await retrieve_skipped_ids();
-    await retrieve_game_name_to_ids();
-    await retrieve_game_database();
-});
-
 function server_ready() {
-    console.log(`Server running at http://${hostname}:${port}/`);
+    console.log(`Server running on port ${external_port}`);
     READY_TO_RUN = true;
     return;
 }

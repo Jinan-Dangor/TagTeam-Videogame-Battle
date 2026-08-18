@@ -223,13 +223,21 @@ const GameScreen = () => {
         gameLinkHistoryRef.current = gameLinkHistory;
     }, [gameLinkHistory]);
     const [currentPlayer, setCurrentPlayer] = useState(Player.P1);
+    const currentPlayerRef = useRef(currentPlayer);
+    useEffect(() => {
+        currentPlayerRef.current = currentPlayer;
+    }, [currentPlayer]);
+    const [localPlayer, setLocalPlayer] = useState(Player.P1);
     const [lifelinesUsed, setLifelinesUsed] = useState<Map<Player, Lifeline[]>>(
         new Map<Player, Lifeline[]>([
             [Player.P1, []],
             [Player.P2, []],
         ]),
     );
-
+    const lifelinesUsedRef = useRef(lifelinesUsed);
+    useEffect(() => {
+        lifelinesUsedRef.current = lifelinesUsed;
+    }, [lifelinesUsed]);
     const [errorText, setErrorText] = useState("");
     const [newGameId, setNewGameId] = useState("");
     const [nameSearchTerm, setNameSearchTerm] = useState("");
@@ -242,7 +250,7 @@ const GameScreen = () => {
     const [tagSuggestions, setTagSuggestions] = useState<TagAutocompleteData[]>([]);
     const [gameNameSuggestions, setGameNameSuggestions] = useState<GameNameAutocompleteData[]>([]);
     const switchPlayer = () => {
-        if (currentPlayer === Player.P1) {
+        if (currentPlayerRef.current === Player.P1) {
             setCurrentPlayer(Player.P2);
         } else {
             setCurrentPlayer(Player.P1);
@@ -322,15 +330,16 @@ const GameScreen = () => {
                 }
                 setPlayerId(apiMessage.key);
             } else if (queryType === "make_guess") {
+                if (apiMessage.errorText) {
+                    setErrorText(apiMessage.errorText);
+                    return;
+                }
                 if (!apiMessage.guessData) {
                     console.error(`guessData absent in game_info request response.`);
                     return;
                 }
-                if (apiMessage.errorMessage) {
-                    setErrorText(apiMessage.errorMessage);
-                    return;
-                }
                 const newGuessData = apiMessage.guessData;
+                const guessedGameId = newGuessData.gameId;
                 const guessMatchResult = newGuessData.matchResult;
                 guessMatchResult.type = StrToMatchType(guessMatchResult.type);
                 const guessMatchType = guessMatchResult.type;
@@ -349,8 +358,8 @@ const GameScreen = () => {
                         });
                     }
                     if (guessMatchType !== MatchType.None) {
-                        setGameHistory([...gameHistoryRef.current, { id: newGameId, data: guessGameData, lifelinesUsed: [] }]);
-                        setUsedGameIds([...usedGameIdsRef.current, newGameId]);
+                        setGameHistory([...gameHistoryRef.current, { id: guessedGameId, data: guessGameData, lifelinesUsed: [] }]);
+                        setUsedGameIds([...usedGameIdsRef.current, guessedGameId]);
                         setGameLinkHistory([...gameLinkHistoryRef.current, { match: guessMatchResult, counts: guessNewCounts }]);
                         setErrorText("");
                         switchPlayer();
@@ -392,12 +401,28 @@ const GameScreen = () => {
                     console.log(`Game joined successfully! Duel Key: ${apiMessage.duelKey}`);
                 } else {
                     console.error(`Failed to join game`);
+                    return;
                 }
+                setLocalPlayer(Player.P2);
                 setDuelKey(apiMessage.duelKey);
                 setGameConnectedTo(true);
                 setOtherPlayerConnected(true);
             } else if (queryType === "turn_started") {
             } else if (queryType === "use_lifeline") {
+                if (!apiMessage.lifelineUsed) {
+                    console.error(`A lifeline was used, but the server didn't specify which.`);
+                    return;
+                }
+                const lifelineUsed = apiMessage.lifelineUsed;
+                if (lifelineUsed == "revealArt") {
+                    onClickLifelineRevealArt();
+                } else if (lifelineUsed == "revealTags") {
+                    onClickLifelineRevealTags();
+                } else if (lifelineUsed == "skip") {
+                    onClickLifelineSkip();
+                } else {
+                    console.error(`A lifeline was used, but the provided lifeline type doesn't exist: ${lifelineUsed}`);
+                }
             } else if (queryType === "get_duel_state") {
                 const necessaryFields = [
                     "settings",
@@ -429,7 +454,7 @@ const GameScreen = () => {
                 setCreatorUsedCount(apiMessage.creatorUsedCount);
                 setGameHistory(apiMessage.gameHistory);
                 setGameLinkHistory(apiMessage.gameLinkHistory);
-                setCurrentPlayer(StrToPlayer(apiMessage.currentPlayer));
+                //setCurrentPlayer(StrToPlayer(apiMessage.currentPlayer));
                 const lifelinesUsedConverted = apiMessage.lifelinesUsed.map((lifelineEntry: any) => [StrToPlayer(lifelineEntry[0]), lifelineEntry[1].map((lifeline: any) => StrToLifeline(lifeline))]);
                 setLifelinesUsed(new Map<Player, Lifeline[]>(lifelinesUsedConverted));
             } else {
@@ -483,56 +508,70 @@ const GameScreen = () => {
                 setErrorText(`${tagSearchTerm} has already been played.`);
                 return;
             }
-            console.log(selectedTag);
             sendApiMessage("make_guess", { duelKey, playerId, gameId: newGameId, selectedTag: selectedTag });
         }
     }, [newGameId, selectedTag]);
+
+    function onClickLifelineRevealArt(): void {
+        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
+        const tempLifelinesUsed = lifelinesUsedRef.current;
+        tempLifelinesUsed.get(currentPlayerRef.current)?.push(Lifeline.RevealArt);
+        setLifelinesUsed(tempLifelinesUsed);
+        let currentGame = gameHistoryRef.current[gameHistoryRef.current.length - 1];
+        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
+        setGameHistory([...gameHistoryRef.current.slice(0, gameHistoryRef.current.length - 1), currentGame]);
+    }
+
+    function onClickLifelineRevealTags(): void {
+        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
+        const tempLifelinesUsed = lifelinesUsedRef.current;
+        tempLifelinesUsed.get(currentPlayerRef.current)?.push(Lifeline.RevealTags);
+        setLifelinesUsed(tempLifelinesUsed);
+        let currentGame = gameHistoryRef.current[gameHistoryRef.current.length - 1];
+        currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
+        setGameHistory([...gameHistoryRef.current.slice(0, gameHistoryRef.current.length - 1), currentGame]);
+    }
+
+    function onClickLifelineSkip(): void {
+        if (gameLinkHistoryRef.current.length > 0 && gameLinkHistoryRef.current[gameLinkHistoryRef.current.length - 1].match.type === MatchType.Skip) {
+            setGameIsOver(true);
+            setGameResult(GameResult.Draw);
+            setGameHistory([
+                ...gameHistoryRef.current.slice(0, gameHistoryRef.current.length - 1),
+                {
+                    ...gameHistoryRef.current[gameHistoryRef.current.length - 1],
+                    lifelinesUsed: [...new Set([...gameHistoryRef.current[gameHistoryRef.current.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
+                },
+            ]);
+            return;
+        }
+        const tempLifelinesUsed = lifelinesUsedRef.current;
+        tempLifelinesUsed.get(currentPlayerRef.current)?.push(Lifeline.Skip);
+        setLifelinesUsed(tempLifelinesUsed);
+        let currentGame = gameHistoryRef.current[gameHistoryRef.current.length - 1];
+        currentGame = { ...currentGame, lifelinesUsed: [] };
+        setGameHistory([...gameHistoryRef.current, currentGame]);
+        setGameLinkHistory([...gameLinkHistoryRef.current, { match: { type: MatchType.Skip }, counts: [] }]);
+        setErrorText("");
+        switchPlayer();
+        setTimerTimeLeft(timeLimit.current);
+    }
 
     const LifelineButtonsTemplate = (
         <LifelineButtons
             lifelinesUsed={lifelinesUsed}
             currentPlayer={currentPlayer}
             onClickRevealArt={() => {
-                setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
-                const tempLifelinesUsed = lifelinesUsed;
-                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealArt);
-                setLifelinesUsed(tempLifelinesUsed);
-                let currentGame = gameHistory[gameHistory.length - 1];
-                currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealArt] };
-                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                onClickLifelineRevealArt();
+                sendApiMessage("use_lifeline", { duelKey, playerId, lifelineUsed: "revealArt" });
             }}
             onClickRevealTags={() => {
-                setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
-                const tempLifelinesUsed = lifelinesUsed;
-                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.RevealTags);
-                setLifelinesUsed(tempLifelinesUsed);
-                let currentGame = gameHistory[gameHistory.length - 1];
-                currentGame = { ...currentGame, lifelinesUsed: [...currentGame.lifelinesUsed, Lifeline.RevealTags] };
-                setGameHistory([...gameHistory.slice(0, gameHistory.length - 1), currentGame]);
+                onClickLifelineRevealTags();
+                sendApiMessage("use_lifeline", { duelKey, playerId, lifelineUsed: "revealTags" });
             }}
             onClickSkip={() => {
-                if (gameLinkHistory.length > 0 && gameLinkHistory[gameLinkHistory.length - 1].match.type === MatchType.Skip) {
-                    setGameIsOver(true);
-                    setGameResult(GameResult.Draw);
-                    setGameHistory([
-                        ...gameHistory.slice(0, gameHistory.length - 1),
-                        {
-                            ...gameHistory[gameHistory.length - 1],
-                            lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
-                        },
-                    ]);
-                    return;
-                }
-                const tempLifelinesUsed = lifelinesUsed;
-                tempLifelinesUsed.get(currentPlayer)?.push(Lifeline.Skip);
-                setLifelinesUsed(tempLifelinesUsed);
-                let currentGame = gameHistory[gameHistory.length - 1];
-                currentGame = { ...currentGame, lifelinesUsed: [] };
-                setGameHistory([...gameHistory, currentGame]);
-                setGameLinkHistory([...gameLinkHistory, { match: { type: MatchType.Skip }, counts: [] }]);
-                setErrorText("");
-                switchPlayer();
-                setTimerTimeLeft(timeLimit.current);
+                onClickLifelineSkip();
+                sendApiMessage("use_lifeline", { duelKey, playerId, lifelineUsed: "skip" });
             }}
         />
     );
@@ -621,6 +660,7 @@ const GameScreen = () => {
                                     setValue={(value) => {
                                         setNewGameId(value);
                                     }}
+                                    disabled={localPlayer != currentPlayer}
                                     suggestions={gameNameSuggestions.map((suggestion) => {
                                         return {
                                             label: `${suggestion.name} ${suggestion.year_text !== "" ? `(${suggestion.year_text})` : ""}`,
@@ -654,6 +694,7 @@ const GameScreen = () => {
                                         setValue={(value) => {
                                             setSelectedTag(value);
                                         }}
+                                        disabled={localPlayer != currentPlayer}
                                         suggestions={tagSuggestions.map((suggestion) => {
                                             return {
                                                 label: `${suggestion.name}`,

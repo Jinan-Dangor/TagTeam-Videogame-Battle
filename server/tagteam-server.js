@@ -16,6 +16,7 @@ const game_name_to_ids_file = path.join(__dirname, "game_name_to_ids.json");
 const skipped_ids_file = path.join(__dirname, "skipped_ids.json");
 const game_database_file = path.join(__dirname, "game_database.json");
 const steam_webapi_key_file = path.join(__dirname, "steam_webapi_key.txt");
+const scraped_tags_file = path.join(__dirname, "scrapedTags.json");
 
 /*
     Notes for node-steam-user:
@@ -41,6 +42,8 @@ const steam_webapi_key_file = path.join(__dirname, "steam_webapi_key.txt");
         header_image_url:       https://cdn.akamai.steamstatic.com/steam/apps/${id}/header.jpg
 */
 
+let tags = {};
+let tagData = {};
 let game_database = {};
 let game_name_to_ids = new Map();
 let skipped_ids = [];
@@ -107,6 +110,7 @@ const webSocketServer = new WebSocketServer({ port: external_port });
 bootUpServer();
 
 async function bootUpServer() {
+    await retrieve_scraped_tags();
     await retrieve_skipped_ids();
     await retrieve_game_name_to_ids();
     await retrieve_game_database();
@@ -142,7 +146,6 @@ webSocketServer.on("connection", function connection(ws) {
             activeWebsockets[ws] = {
                 playerId: newPlayerKey,
             };
-            console.log(`Number of players: ${Object.keys(activePlayers).length}`);
             ws.send(serverSuccessResponse(queryType, queryId, { key: newPlayerKey }));
         } else if (queryType === "game_info") {
             if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["gameId"])) {
@@ -185,6 +188,13 @@ webSocketServer.on("connection", function connection(ws) {
             if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["playerId"])) {
                 return;
             }
+            const playerId = newRequest.playerId;
+            if (!Object.keys(activePlayers).includes(playerId)) {
+                console.log(playerId);
+                console.log(activePlayers);
+                ws.send(errorResponse(queryType, queryId, "Player id not found, refresh your page"));
+                return;
+            }
             let newDuelKey = generateUniqueKey(Object.keys(activeDuels));
             const startingGameId = "440";
             activeDuels[newDuelKey] = {
@@ -205,14 +215,14 @@ webSocketServer.on("connection", function connection(ws) {
                     },
                 ],
                 gameLinkHistory: [],
-                playerIds: [newRequest.playerId],
+                playerIds: [playerId],
                 currentPlayer: "P1",
                 lifelinesUsed: [
                     ["P1", []],
                     ["P2", []],
                 ],
             };
-            activePlayers[newRequest.playerId].currentDuelId = newDuelKey;
+            activePlayers[playerId].currentDuelId = newDuelKey;
             ws.send(serverSuccessResponse(queryType, queryId, { newDuelKey }));
         } else if (queryType === "start_game") {
             if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId"])) {
@@ -260,8 +270,9 @@ webSocketServer.on("connection", function connection(ws) {
             let matchResult;
             const duelKey = newRequest.duelKey;
             const playerId = newRequest.playerId;
+            const gameId = newRequest.gameId;
             const index = activeDuels[duelKey].playerIds.indexOf(playerId);
-            const game = game_database[newRequest.gameId];
+            const game = game_database[gameId];
             const matchingSystem = activeDuels[duelKey].settings.matchSystem;
             const duelHistory = activeDuels[duelKey].gameHistory;
             const latestHistory = duelHistory[duelHistory.length - 1];
@@ -279,7 +290,6 @@ webSocketServer.on("connection", function connection(ws) {
             let newCounts = [];
             let newDict;
             if (matchResult.type === MatchType.Tags) {
-                console.log("Tags Used", tagUsedCount);
                 newDict = {};
                 for (let i = 0; i < (matchResult.tag_ids?.length ?? 0); i++) {
                     const newTagId = matchResult.tag_ids?.[i] ?? 0;
@@ -293,15 +303,16 @@ webSocketServer.on("connection", function connection(ws) {
                     }
                     if (newTagId in tagUsedCount) {
                         newDict[newTagId] = tagUsedCount[newTagId] + 1;
-                        newCounts.push(tagUsedCount[newTagId] + 1);
+                        activeDuels[duelKey].tagUsedCount[newTagId] += 1;
+                        newCounts.push(tagUsedCount[newTagId]);
                     } else {
                         newDict[newTagId] = 1;
+                        activeDuels[duelKey].tagUsedCount[newTagId] = 1;
                         newCounts.push(1);
                     }
                 }
             }
             if (matchResult.type === MatchType.Creators) {
-                console.log("Creators Used", creatorUsedCount);
                 newDict = {};
                 for (let i = 0; i < (matchResult.creators?.length ?? 0); i++) {
                     const newCreatorName = matchResult.creators?.[i] ?? 0;
@@ -314,18 +325,32 @@ webSocketServer.on("connection", function connection(ws) {
                         return;
                     }
                     if (newCreatorName in creatorUsedCount) {
-                        console.log("It's here!");
                         newDict[newCreatorName] = creatorUsedCount[newCreatorName] + 1;
-                        newCounts.push(creatorUsedCount[newCreatorName] + 1);
+                        activeDuels[duelKey].creatorUsedCount[newCreatorName] += 1;
+                        newCounts.push(creatorUsedCount[newCreatorName]);
                     } else {
                         newDict[newCreatorName] = 1;
+                        activeDuels[duelKey].creatorUsedCount[newCreatorName] = 1;
                         newCounts.push(1);
                     }
                 }
             }
-            ws.send(serverSuccessResponse(queryType, queryId, { guessData: { gameData: game, matchResult, newCounts, newDict } }));
-            activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse(queryType, queryId, { guessData: { gameData: game, matchResult, newCounts, newDict } }));
+            if (matchResult.type !== MatchType.None) {
+                activeDuels[duelKey].gameHistory.push({ id: gameId, data: game, lifelinesUsed: [] });
+            }
+            ws.send(serverSuccessResponse(queryType, queryId, { guessData: { gameId, gameData: game, matchResult, newCounts, newDict } }));
+            activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(
+                serverSuccessResponse(queryType, queryId, { guessData: { gameId, gameData: game, matchResult, newCounts, newDict } }),
+            );
         } else if (queryType === "use_lifeline") {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId", "lifelineUsed"])) {
+                return;
+            }
+            const duelKey = newRequest.duelKey;
+            const playerId = newRequest.playerId;
+            const index = activeDuels[duelKey].playerIds.indexOf(playerId);
+            const lifelineUsed = newRequest.lifelineUsed;
+            activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse(queryType, queryId, { lifelineUsed }));
         } else if (queryType === "get_duel_state") {
             if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey"])) {
                 return;
@@ -394,6 +419,13 @@ function server_ready() {
     console.log(`Server running on port ${external_port}`);
     READY_TO_RUN = true;
     return;
+}
+
+async function retrieve_scraped_tags() {
+    if (fs.existsSync(scraped_tags_file)) {
+        tags = JSON.parse(fs.readFileSync(scraped_tags_file, { encoding: "utf-8" }));
+        tags.forEach((tag) => (tagData[tag.ID] = { name: tag.name, emoji: tag.emoji }));
+    }
 }
 
 async function retrieve_skipped_ids() {

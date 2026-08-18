@@ -3,6 +3,7 @@ import "../styles/AutocompleteInput.css";
 
 interface IAutocompleteInputProps {
     placeholder?: string;
+    disabled?: boolean;
     value: string;
     setValue: (value: string) => void;
     suggestions: Suggestion[];
@@ -19,7 +20,7 @@ type Suggestion = {
 const TIME_UNTIL_CLOSE_AFTER_LEAVE_MS = 1000;
 const TIME_UNTIL_CLOSE_AFTER_INACTIVE_MS = 5000;
 
-const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onChange, onSelectSuggestion }: IAutocompleteInputProps) => {
+const AutocompleteInput = ({ placeholder = "", disabled = false, value, setValue, suggestions, onChange, onSelectSuggestion }: IAutocompleteInputProps) => {
     const [shouldKeepSuggestionsOpen, setShouldKeepSuggestionsOpen] = useState(false);
     const [leaveTimeoutId, setLeaveTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
     const [inactiveTimeoutId, setInactiveTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -38,7 +39,7 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
         setInactiveTimeoutId(
             setTimeout(() => {
                 setShouldKeepSuggestionsOpen(false);
-            }, TIME_UNTIL_CLOSE_AFTER_INACTIVE_MS)
+            }, TIME_UNTIL_CLOSE_AFTER_INACTIVE_MS),
         );
     };
 
@@ -48,6 +49,7 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
                 className="input-text"
                 placeholder={placeholder}
                 value={value}
+                disabled={disabled}
                 onChange={(e) => {
                     onChange(e);
                     setValue("");
@@ -82,7 +84,7 @@ const AutocompleteInput = ({ placeholder = "", value, setValue, suggestions, onC
                         setLeaveTimeoutId(
                             setTimeout(() => {
                                 setShouldKeepSuggestionsOpen(false);
-                            }, TIME_UNTIL_CLOSE_AFTER_LEAVE_MS)
+                            }, TIME_UNTIL_CLOSE_AFTER_LEAVE_MS),
                         );
                     }}
                 >

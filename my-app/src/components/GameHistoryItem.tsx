@@ -19,7 +19,7 @@ const GameHistoryItem = ({ id, gameNumber, data, tagData, lifelinesUsed, viewDet
         <div className={`game-history-item ${player === Player.P1 ? "player-one" : "player-two"}`}>
             <div className="game-counter">#{gameNumber}</div>
             <div className="game-history-container">
-                {(lifelinesUsed.includes(Lifeline.RevealArt) || viewDetailsClicked) && (
+                {(lifelinesUsed.includes(Lifeline.RevealArt) || viewDetailsClicked || gameNumber == 1) && (
                     <div className="revealed-art-container">
                         <img className="revealed-art" src={`https://cdn.akamai.steamstatic.com/steam/apps/${id}/header.jpg`} />
                     </div>
@@ -28,7 +28,7 @@ const GameHistoryItem = ({ id, gameNumber, data, tagData, lifelinesUsed, viewDet
                     <div className="game-title">
                         {data.name} {getReleaseYearString(data)}
                     </div>
-                    {(lifelinesUsed.includes(Lifeline.RevealTags) || viewDetailsClicked) && (
+                    {(lifelinesUsed.includes(Lifeline.RevealTags) || viewDetailsClicked || gameNumber == 1) && (
                         <div className="revealed-tags">
                             {" "}
                             {data.tag_ids.map((tag) => {
@@ -40,7 +40,7 @@ const GameHistoryItem = ({ id, gameNumber, data, tagData, lifelinesUsed, viewDet
                             })}{" "}
                         </div>
                     )}
-                    {viewDetailsButtonVisible && !viewDetailsClicked && !(lifelinesUsed.includes(Lifeline.RevealArt) && lifelinesUsed.includes(Lifeline.RevealTags)) && (
+                    {viewDetailsButtonVisible && !viewDetailsClicked && !(lifelinesUsed.includes(Lifeline.RevealArt) && lifelinesUsed.includes(Lifeline.RevealTags) && gameNumber == 1) && (
                         <div
                             className="view-details-button"
                             onClick={() => {

@@ -88,6 +88,7 @@ let READY_TO_RUN = false;
 let activeDuels = {};
 let activeWebsockets = {};
 let activePlayers = {};
+const NO_CONNECTION = "<no connection>";
 
 const generateUniqueKey = (existingKeys) => {
     const possibleChars = "0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM";
@@ -117,6 +118,8 @@ async function bootUpServer() {
 }
 
 webSocketServer.on("connection", function connection(ws) {
+    const newSocketKey = generateUniqueKey(Object.keys(activeWebsockets));
+
     ws.on("message", function message(data) {
         const newRequest = JSON.parse(data.toString());
         //ws.send("Connection successful!");
@@ -143,9 +146,7 @@ webSocketServer.on("connection", function connection(ws) {
             activePlayers[newPlayerKey] = {
                 websocket: ws,
             };
-            activeWebsockets[ws] = {
-                playerId: newPlayerKey,
-            };
+            activeWebsockets[newSocketKey] = { socket: ws, playerId: newPlayerKey };
             ws.send(serverSuccessResponse(queryType, queryId, { key: newPlayerKey }));
         } else if (queryType === "game_info") {
             if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["gameId"])) {
@@ -191,8 +192,6 @@ webSocketServer.on("connection", function connection(ws) {
             const playerId = newRequest.playerId;
             const matchSystem = newRequest.matchSystem;
             if (!Object.keys(activePlayers).includes(playerId)) {
-                console.log(playerId);
-                console.log(activePlayers);
                 ws.send(errorResponse(queryType, queryId, "Player id not found, refresh your page"));
                 return;
             }
@@ -216,7 +215,7 @@ webSocketServer.on("connection", function connection(ws) {
                     },
                 ],
                 gameLinkHistory: [],
-                playerIds: [playerId],
+                playerIds: [playerId, NO_CONNECTION],
                 currentPlayer: "P1",
                 lifelinesUsed: [
                     ["P1", []],
@@ -252,11 +251,17 @@ webSocketServer.on("connection", function connection(ws) {
             if (Object.keys(activeDuels).includes(duelKey)) {
                 if (activeDuels[duelKey].gameStarted) {
                     ws.send(errorResponse(queryType, queryId, "Game already in progress."));
+                    return;
                 }
-                if (activeDuels[duelKey].playerIds.length > 1) {
+                if (activeDuels[duelKey].playerIds[0] != NO_CONNECTION && activeDuels[duelKey].playerIds[1] != NO_CONNECTION) {
                     ws.send(errorResponse(queryType, queryId, "Game already has two players."));
+                    return;
                 }
-                activeDuels[duelKey].playerIds.push(playerId);
+                if (activeDuels[duelKey].playerIds[0] == NO_CONNECTION) {
+                    activeDuels[duelKey].playerIds[0] = playerId;
+                } else {
+                    activeDuels[duelKey].playerIds[1] = playerId;
+                }
                 activePlayers[playerId].currentDuelId = duelKey;
                 ws.send(serverSuccessResponse(queryType, queryId, { duelKey }));
                 activePlayers[activeDuels[duelKey].playerIds[0]].websocket.send(serverSuccessResponse("player_joined", queryId, {}));
@@ -368,12 +373,12 @@ webSocketServer.on("connection", function connection(ws) {
     });
 
     ws.on("close", function disconnect(data) {
-        const playerId = activeWebsockets[ws].playerId;
+        const playerId = activeWebsockets[newSocketKey].playerId;
         if (activePlayers[playerId].currentDuelId != null) {
             const duelKey = activePlayers[playerId].currentDuelId;
             const index = activeDuels[duelKey].playerIds.indexOf(playerId);
-            activeDuels[duelKey].playerIds[index] = "<disconnected>";
-            if (activeDuels[duelKey].playerIds[1 - index] != "<disconnected>") {
+            activeDuels[duelKey].playerIds[index] = NO_CONNECTION;
+            if (activeDuels[duelKey].playerIds[1 - index] != NO_CONNECTION) {
                 activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse("player_disconnected", "", {}));
             } else {
                 delete activeDuels[duelKey];

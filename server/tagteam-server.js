@@ -185,10 +185,11 @@ webSocketServer.on("connection", function connection(ws) {
                 .slice(0, 10);
             ws.send(serverSuccessResponse(queryType, queryId, { searchResults: valid_games }));
         } else if (queryType === "host_game") {
-            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["playerId"])) {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["playerId", "matchSystem"])) {
                 return;
             }
             const playerId = newRequest.playerId;
+            const matchSystem = newRequest.matchSystem;
             if (!Object.keys(activePlayers).includes(playerId)) {
                 console.log(playerId);
                 console.log(activePlayers);
@@ -199,7 +200,7 @@ webSocketServer.on("connection", function connection(ws) {
             const startingGameId = "440";
             activeDuels[newDuelKey] = {
                 settings: {
-                    matchSystem: "CalledTags",
+                    matchSystem: matchSystem,
                 },
                 gameStarted: false,
                 gameIsOver: false,

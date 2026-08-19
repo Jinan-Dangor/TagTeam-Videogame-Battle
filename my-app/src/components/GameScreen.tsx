@@ -290,7 +290,7 @@ const GameScreen = () => {
     useEffect(() => {
         // Local: "ws://localhost:8080"
         // Local network: "ws://192.168.0.65:8080"
-        serverSocket.current = new WebSocket("ws://localhost:8080");
+        serverSocket.current = new WebSocket("ws://157.211.249.178:8080");
 
         const newSocket = serverSocket.current;
 

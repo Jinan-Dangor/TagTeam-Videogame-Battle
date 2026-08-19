@@ -153,6 +153,18 @@ const StrToSettingMatchSystem = (s: string) => {
     }
 };
 
+const SettingMatchSystemToStr = (m: SettingMatchSystem) => {
+    switch (m) {
+        case SettingMatchSystem.TopFiveTags:
+            return "TopFiveTags";
+        case SettingMatchSystem.CalledTags:
+            return "CalledTags";
+        default:
+            console.error(`Attempting to convert invalid SettingMatchSystem enum ${m} into a string.`);
+            return SettingMatchSystem.CalledTags;
+    }
+};
+
 export function unescapeChars(str: string) {
     return new DOMParser().parseFromString(str, "text/html").documentElement.textContent;
 }
@@ -395,7 +407,6 @@ const GameScreen = () => {
                 setGameStarted(true);
                 setTimerTimeLeft(timeLimit.current);
                 setTimerActive(true);
-                console.log("Somebody started the game!");
             } else if (queryType === "join_game") {
                 if (apiMessage.success && apiMessage.duelKey) {
                     console.log(`Game joined successfully! Duel Key: ${apiMessage.duelKey}`);
@@ -454,7 +465,6 @@ const GameScreen = () => {
                 setCreatorUsedCount(apiMessage.creatorUsedCount);
                 setGameHistory(apiMessage.gameHistory);
                 setGameLinkHistory(apiMessage.gameLinkHistory);
-                //setCurrentPlayer(StrToPlayer(apiMessage.currentPlayer));
                 const lifelinesUsedConverted = apiMessage.lifelinesUsed.map((lifelineEntry: any) => [StrToPlayer(lifelineEntry[0]), lifelineEntry[1].map((lifeline: any) => StrToLifeline(lifeline))]);
                 setLifelinesUsed(new Map<Player, Lifeline[]>(lifelinesUsedConverted));
             } else {
@@ -584,7 +594,7 @@ const GameScreen = () => {
                     <button
                         style={{ fontSize: "large" }}
                         onClick={() => {
-                            sendApiMessage("host_game", { playerId: playerId });
+                            sendApiMessage("host_game", { playerId: playerId, matchSystem: SettingMatchSystemToStr(settingMatchSystem) });
                         }}
                     >
                         Host Game

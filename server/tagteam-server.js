@@ -353,9 +353,9 @@ webSocketServer.on("connection", function connection(ws) {
             if (matchResult.type !== MatchType.None) {
                 activeDuels[duelKey].gameHistory.push({ id: gameId, data: game, lifelinesUsed: [] });
             }
-            ws.send(serverSuccessResponse(queryType, queryId, { guessData: { gameId, gameData: game, matchResult, newCounts, newDict } }));
+            ws.send(serverSuccessResponse(queryType, queryId, { guessData: { gameId, gameData: game, matchResult, newCounts, newDict, selectedTag } }));
             activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(
-                serverSuccessResponse(queryType, queryId, { guessData: { gameId, gameData: game, matchResult, newCounts, newDict } }),
+                serverSuccessResponse(queryType, queryId, { guessData: { gameId, gameData: game, matchResult, newCounts, newDict, selectedTag } }),
             );
         } else if (queryType === "use_lifeline") {
             if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId", "lifelineUsed"])) {

@@ -393,7 +393,23 @@ const GameScreen = () => {
                         setNameSearchTerm("");
                         setNewGameId("");
                     } else {
-                        setErrorText(`No connections to ${guessGameData.name}${guessGameData.year_text ? ` (${guessGameData.year_text})` : ""}.`);
+                        const currentGameName = gameHistoryRef.current[gameHistoryRef.current.length - 1].data.name;
+                        if (settingMatchSystemRef.current == SettingMatchSystem.CalledTags) {
+                            if (!newGuessData.selectedTag) {
+                                setErrorText(
+                                    `Please select the tag you think ${currentGameName} and ${guessGameData.name}${guessGameData.year_text ? ` (${guessGameData.year_text})` : ""} have in common.`,
+                                );
+                            } else {
+                                const tagId = newGuessData.selectedTag;
+                                setErrorText(
+                                    `${currentGameName} is not connected to ${guessGameData.name}${guessGameData.year_text ? ` (${guessGameData.year_text})` : ""} by ${tagData[tagId].name} ${tagData[tagId].emoji}.`,
+                                );
+                            }
+                        } else if (settingMatchSystemRef.current == SettingMatchSystem.TopFiveTags) {
+                            setErrorText(`${currentGameName} does not share any of its top 5 tags with ${guessGameData.name}${guessGameData.year_text ? ` (${guessGameData.year_text})` : ""}.`);
+                        } else {
+                            setErrorText("The system was not set up to display matching errors for games using this system");
+                        }
                     }
                 }
             } else if (queryType === "autocomplete_games") {
@@ -486,7 +502,6 @@ const GameScreen = () => {
                         return;
                     }
                 }
-                console.log(apiMessage.playerNames);
                 setPlayer1Name(apiMessage.playerNames[0]);
                 setPlayer2Name(apiMessage.playerNames[1]);
                 setSettingMatchSystem(StrToSettingMatchSystem(apiMessage.settings.matchSystem));

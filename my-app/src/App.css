@@ -11,3 +11,8 @@ button {
     border: none;
     font-family: Oswald, Tahoma, Geneva, Verdana, sans-serif;
 }
+
+.input-text {
+    font-family: Oswald, Tahoma, Geneva, Verdana, sans-serif;
+    font-size: medium;
+}

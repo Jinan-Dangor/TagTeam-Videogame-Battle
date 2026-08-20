@@ -5,19 +5,20 @@ import { Lifeline, Player } from "./GameScreen";
 interface ILifelineButtonsProps {
     lifelinesUsed: Map<Player, Lifeline[]>;
     currentPlayer: Player;
+    disabled?: boolean;
     onClickRevealArt: () => void;
     onClickRevealTags: () => void;
     onClickSkip: () => void;
 }
 
-const LifelineButtons = ({ lifelinesUsed, currentPlayer, onClickRevealArt, onClickRevealTags, onClickSkip }: ILifelineButtonsProps) => {
+const LifelineButtons = ({ lifelinesUsed, currentPlayer, disabled = false, onClickRevealArt, onClickRevealTags, onClickSkip }: ILifelineButtonsProps) => {
     return (
         <div className="lifeline-buttons">
             <div
                 className={`lifeline-button-container ${currentPlayer === Player.P1 ? "player-one" : "player-two"}`}
                 style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealArt) ? "visible" : "hidden" }}
             >
-                <button className="lifeline-button" type="button" onClick={onClickRevealArt}>
+                <button className="lifeline-button" type="button" onClick={onClickRevealArt} disabled={disabled} style={{ opacity: disabled ? "50%" : "100%" }}>
                     Use Art Lifeline
                 </button>
             </div>
@@ -25,7 +26,7 @@ const LifelineButtons = ({ lifelinesUsed, currentPlayer, onClickRevealArt, onCli
                 className={`lifeline-button-container ${currentPlayer === Player.P1 ? "player-one" : "player-two"}`}
                 style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.RevealTags) ? "visible" : "hidden" }}
             >
-                <button className="lifeline-button" type="button" onClick={onClickRevealTags}>
+                <button className="lifeline-button" type="button" onClick={onClickRevealTags} disabled={disabled} style={{ opacity: disabled ? "50%" : "100%" }}>
                     Use Tag Lifeline
                 </button>
             </div>
@@ -33,7 +34,7 @@ const LifelineButtons = ({ lifelinesUsed, currentPlayer, onClickRevealArt, onCli
                 className={`lifeline-button-container ${currentPlayer === Player.P1 ? "player-one" : "player-two"}`}
                 style={{ visibility: !lifelinesUsed.get(currentPlayer)?.includes(Lifeline.Skip) ? "visible" : "hidden" }}
             >
-                <button className="lifeline-button" type="button" onClick={onClickSkip}>
+                <button className="lifeline-button" type="button" onClick={onClickSkip} disabled={disabled} style={{ opacity: disabled ? "50%" : "100%" }}>
                     Use Skip Lifeline
                 </button>
             </div>

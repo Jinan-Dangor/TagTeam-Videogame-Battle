@@ -186,10 +186,11 @@ webSocketServer.on("connection", function connection(ws) {
                 .slice(0, 10);
             ws.send(serverSuccessResponse(queryType, queryId, { searchResults: valid_games }));
         } else if (queryType === "host_game") {
-            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["playerId", "matchSystem"])) {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["playerId", "playerName", "matchSystem"])) {
                 return;
             }
             const playerId = newRequest.playerId;
+            const playerName = newRequest.playerName;
             const matchSystem = newRequest.matchSystem;
             if (!Object.keys(activePlayers).includes(playerId)) {
                 ws.send(errorResponse(queryType, queryId, "Player id not found, refresh your page"));
@@ -216,6 +217,7 @@ webSocketServer.on("connection", function connection(ws) {
                 ],
                 gameLinkHistory: [],
                 playerIds: [playerId, NO_CONNECTION],
+                playerNames: [playerName, NO_CONNECTION],
                 currentPlayer: "P1",
                 lifelinesUsed: [
                     ["P1", []],
@@ -239,15 +241,17 @@ webSocketServer.on("connection", function connection(ws) {
                 ws.send(errorResponse(queryType, queryId, "Duel id not found"));
             }
         } else if (queryType === "join_game") {
-            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId"])) {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId", "playerName"])) {
                 return;
             }
             const playerId = newRequest.playerId;
+            const playerName = newRequest.playerName;
             if (!Object.keys(activePlayers).includes(playerId)) {
                 ws.send(errorResponse(queryType, queryId, "Player id not found, refresh the page"));
                 return;
             }
             const duelKey = newRequest.duelKey;
+            let playerNum = -1;
             if (Object.keys(activeDuels).includes(duelKey)) {
                 if (activeDuels[duelKey].gameStarted) {
                     ws.send(errorResponse(queryType, queryId, "Game already in progress."));
@@ -259,12 +263,17 @@ webSocketServer.on("connection", function connection(ws) {
                 }
                 if (activeDuels[duelKey].playerIds[0] == NO_CONNECTION) {
                     activeDuels[duelKey].playerIds[0] = playerId;
+                    activeDuels[duelKey].playerNames[0] = playerName;
+                    playerNum = 0;
                 } else {
                     activeDuels[duelKey].playerIds[1] = playerId;
+                    activeDuels[duelKey].playerNames[1] = playerName;
+                    playerNum = 1;
                 }
+                const index = activeDuels[duelKey].playerIds.indexOf(playerId);
                 activePlayers[playerId].currentDuelId = duelKey;
-                ws.send(serverSuccessResponse(queryType, queryId, { duelKey }));
-                activePlayers[activeDuels[duelKey].playerIds[0]].websocket.send(serverSuccessResponse("player_joined", queryId, {}));
+                ws.send(serverSuccessResponse(queryType, queryId, { duelKey, playerNumber: playerNum, otherPlayerName: activeDuels[duelKey].playerNames[1 - index] }));
+                activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse("player_joined", queryId, { otherPlayerName: activeDuels[duelKey].playerNames[index] }));
             } else {
                 ws.send(errorResponse(queryType, queryId, "Duel id not found"));
             }

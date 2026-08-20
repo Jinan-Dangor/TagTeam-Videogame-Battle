@@ -8,6 +8,12 @@ import TurnTimer, { TimerContext } from "./TurnTimer";
 import LifelineButtons from "./LifelineButtons";
 import { initializePalette } from "../utilities/ColourPalette";
 
+// Local: "ws://localhost:8080"
+// Local network: "ws://192.168.0.65:8080"
+// Internet: "ws://157.211.249.178:8080"
+const SERVER_IP = "ws://localhost:8080";
+const DEFAULT_NAME = "Anonymous Gamer";
+
 export type GameData = {
     name: string;
     developers: string[];
@@ -194,6 +200,12 @@ const GameScreen = () => {
     const outgoingApiCalls = useRef<string[]>([]);
     const latestGameAutocompleteId = useRef<string>();
     const [playerId, setPlayerId] = useState<string | null>(null);
+    const [playerName, setPlayerName] = useState<string>(localStorage.getItem("localName") != null ? (localStorage.getItem("localName") as string) : DEFAULT_NAME);
+    useEffect(() => {
+        console.log(playerName);
+    }, [playerName]);
+    const [player1Name, setPlayer1Name] = useState<string>(DEFAULT_NAME);
+    const [player2Name, setPlayer2Name] = useState<string>(DEFAULT_NAME);
     const [duelKey, setDuelKey] = useState<string | null>(null);
     const [settingMatchSystem, setSettingMatchSystem] = useState(SettingMatchSystem.CalledTags);
     const settingMatchSystemRef = useRef(settingMatchSystem);
@@ -272,6 +284,10 @@ const GameScreen = () => {
     const timeLimit = useRef(60000);
     const [lifelineTimeBonus, setLifelineTimeBonus] = useState(20000);
     const [timerTimeLeft, setTimerTimeLeft] = useState(timeLimit.current);
+    const timerTimeLeftRef = useRef(timerTimeLeft);
+    useEffect(() => {
+        timerTimeLeftRef.current = timerTimeLeft;
+    }, [timerTimeLeft]);
     let tagData: { [id: string]: TagData } = {};
     tags.forEach((tag) => (tagData[tag.ID] = { name: tag.name, emoji: tag.emoji }));
 
@@ -300,9 +316,7 @@ const GameScreen = () => {
     };
 
     useEffect(() => {
-        // Local: "ws://localhost:8080"
-        // Local network: "ws://192.168.0.65:8080"
-        serverSocket.current = new WebSocket("ws://157.211.249.178:8080");
+        serverSocket.current = new WebSocket(SERVER_IP);
 
         const newSocket = serverSocket.current;
 
@@ -392,6 +406,11 @@ const GameScreen = () => {
                 }
             } else if (queryType === "player_joined") {
                 setOtherPlayerConnected(true);
+                if (localPlayer == Player.P1) {
+                    setPlayer2Name(apiMessage.otherPlayerName);
+                } else {
+                    setPlayer1Name(apiMessage.otherPlayerName);
+                }
             } else if (queryType === "player_disconnected") {
                 setOtherPlayerConnected(false);
             } else if (queryType === "host_game") {
@@ -414,7 +433,19 @@ const GameScreen = () => {
                     console.error(`Failed to join game`);
                     return;
                 }
-                setLocalPlayer(Player.P2);
+                if (!Object.keys(apiMessage).includes("playerNumber")) {
+                    console.error(`Was not told which player I am`);
+                    return;
+                }
+                console.log(apiMessage);
+                if (apiMessage.playerNumber == 0) {
+                    setPlayer2Name(apiMessage.otherPlayerName);
+                    setPlayer1Name(playerName);
+                } else {
+                    setPlayer1Name(apiMessage.otherPlayerName);
+                    setPlayer2Name(playerName);
+                }
+                setLocalPlayer(apiMessage.playerNumber == 0 ? Player.P1 : Player.P2);
                 setDuelKey(apiMessage.duelKey);
                 setGameConnectedTo(true);
                 setOtherPlayerConnected(true);
@@ -446,6 +477,7 @@ const GameScreen = () => {
                     "gameLinkHistory",
                     "currentPlayer",
                     "lifelinesUsed",
+                    "playerNames",
                 ];
                 for (let i = 0; i < necessaryFields.length; i++) {
                     if (apiMessage[necessaryFields[i]] === null) {
@@ -454,6 +486,9 @@ const GameScreen = () => {
                         return;
                     }
                 }
+                console.log(apiMessage.playerNames);
+                setPlayer1Name(apiMessage.playerNames[0]);
+                setPlayer2Name(apiMessage.playerNames[1]);
                 setSettingMatchSystem(StrToSettingMatchSystem(apiMessage.settings.matchSystem));
                 setGameStarted(apiMessage.gameStarted);
                 setGameIsOver(apiMessage.gameIsOver);
@@ -523,7 +558,7 @@ const GameScreen = () => {
     }, [newGameId, selectedTag]);
 
     function onClickLifelineRevealArt(): void {
-        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
+        setTimerTimeLeft(timerTimeLeftRef.current + lifelineTimeBonus);
         const tempLifelinesUsed = lifelinesUsedRef.current;
         tempLifelinesUsed.get(currentPlayerRef.current)?.push(Lifeline.RevealArt);
         setLifelinesUsed(tempLifelinesUsed);
@@ -533,7 +568,7 @@ const GameScreen = () => {
     }
 
     function onClickLifelineRevealTags(): void {
-        setTimerTimeLeft(timerTimeLeft + lifelineTimeBonus);
+        setTimerTimeLeft(timerTimeLeftRef.current + lifelineTimeBonus);
         const tempLifelinesUsed = lifelinesUsedRef.current;
         tempLifelinesUsed.get(currentPlayerRef.current)?.push(Lifeline.RevealTags);
         setLifelinesUsed(tempLifelinesUsed);
@@ -567,10 +602,11 @@ const GameScreen = () => {
         setTimerTimeLeft(timeLimit.current);
     }
 
-    const LifelineButtonsTemplate = (
+    const LifelineButtonsTemplate = (player: Player) => (
         <LifelineButtons
             lifelinesUsed={lifelinesUsed}
-            currentPlayer={currentPlayer}
+            currentPlayer={player}
+            disabled={localPlayer != currentPlayer || localPlayer != player || usedGameIdsRef.current.length == 1}
             onClickRevealArt={() => {
                 onClickLifelineRevealArt();
                 sendApiMessage("use_lifeline", { duelKey, playerId, lifelineUsed: "revealArt" });
@@ -591,10 +627,27 @@ const GameScreen = () => {
             <h1 style={{ marginTop: "0" }}>Multiplayer Steam Chain Test</h1>
             {!gameStarted && !gameConnectedTo && (
                 <>
+                    <p>
+                        Enter your name{" "}
+                        <input
+                            className="input-text"
+                            value={playerName}
+                            onChange={(e) => {
+                                const newName = e.target.value;
+                                if (newName == "") {
+                                    return;
+                                }
+                                setPlayerName(newName);
+                                console.log(`Updating local storage name to ${newName}`);
+                                localStorage.setItem("localName", newName);
+                            }}
+                        />
+                    </p>
                     <button
                         style={{ fontSize: "large" }}
                         onClick={() => {
-                            sendApiMessage("host_game", { playerId: playerId, matchSystem: SettingMatchSystemToStr(settingMatchSystem) });
+                            setPlayer1Name(playerName);
+                            sendApiMessage("host_game", { playerId: playerId, playerName, matchSystem: SettingMatchSystemToStr(settingMatchSystem) });
                         }}
                     >
                         Host Game
@@ -622,16 +675,20 @@ const GameScreen = () => {
                     />
                     <label htmlFor="Top 5 Tags">Match automatically on Top 5 tags</label>
                     <h2>Join Game</h2>
-                    <input
-                        onChange={(e) => {
-                            setDuelKey(e.target.value);
-                        }}
-                    />
+                    <p>
+                        Enter game key{" "}
+                        <input
+                            className="input-text"
+                            onChange={(e) => {
+                                setDuelKey(e.target.value.trim());
+                            }}
+                        />
+                    </p>
                     <button
                         style={{ fontSize: "large" }}
                         onClick={() => {
                             console.log(duelKey);
-                            sendApiMessage("join_game", { playerId: playerId, duelKey: duelKey });
+                            sendApiMessage("join_game", { playerId: playerId, playerName, duelKey: duelKey });
                         }}
                     >
                         Join Game
@@ -647,23 +704,29 @@ const GameScreen = () => {
                         </>
                     )}
                     {otherPlayerConnected && (
-                        <button
-                            style={{ fontSize: "large" }}
-                            onClick={() => {
-                                sendApiMessage("start_game", { playerId: playerId, duelKey: duelKey });
-                            }}
-                        >
-                            Start Game
-                        </button>
+                        <>
+                            <p>{player1Name + " VS " + player2Name}</p>
+                            <button
+                                style={{ fontSize: "large" }}
+                                onClick={() => {
+                                    sendApiMessage("start_game", { playerId: playerId, duelKey: duelKey });
+                                }}
+                            >
+                                Start Game
+                            </button>
+                        </>
                     )}
                 </>
             )}
             {gameStarted && !gameIsOver && (
                 <>
                     <div style={{ display: "flex" }}>
-                        <div style={{ width: "40vw" }}>{currentPlayer === Player.P1 && LifelineButtonsTemplate}</div>
+                        <div style={{ width: "40vw" }}>
+                            <p style={{ textAlign: "right" }}>{player1Name}</p>
+                            {LifelineButtonsTemplate(Player.P1)}
+                        </div>
                         <div style={{ width: "30vw" }}>
-                            <p>Current Player: {currentPlayer === Player.P1 ? "Player 1" : "Player 2"}</p>
+                            <p>Current Player: {currentPlayer === Player.P1 ? player1Name : player2Name}</p>
                             <div style={{ marginBottom: "5px" }}>
                                 <AutocompleteInput
                                     value={nameSearchTerm}
@@ -761,15 +824,18 @@ const GameScreen = () => {
                             </TimerContext.Provider>
                         </div>
 
-                        <div style={{ width: "40vw" }}>{currentPlayer === Player.P2 && LifelineButtonsTemplate}</div>
+                        <div style={{ width: "40vw" }}>
+                            <p style={{ textAlign: "left" }}>{player2Name}</p>
+                            {LifelineButtonsTemplate(Player.P2)}
+                        </div>
                     </div>
                 </>
             )}
             {gameIsOver && (
                 <>
                     <h2>Game Over.</h2>
-                    {gameResult === GameResult.P1Win && <h3>Player 1 wins!</h3>}
-                    {gameResult === GameResult.P2Win && <h3>Player 2 wins!</h3>}
+                    {gameResult === GameResult.P1Win && <h3>{player1Name} wins!</h3>}
+                    {gameResult === GameResult.P2Win && <h3>{player2Name} wins!</h3>}
                     {gameResult === GameResult.Draw && <h3>Draw!</h3>}
                 </>
             )}

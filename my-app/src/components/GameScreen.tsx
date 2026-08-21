@@ -714,7 +714,16 @@ const GameScreen = () => {
                 <>
                     {!otherPlayerConnected && (
                         <>
-                            <p>Your game code is: {duelKey}</p>
+                            <p>
+                                Your game code is: {duelKey}{" "}
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(duelKey ?? "");
+                                    }}
+                                >
+                                    📋
+                                </button>
+                            </p>
                             <p>Waiting for other player...</p>
                         </>
                     )}

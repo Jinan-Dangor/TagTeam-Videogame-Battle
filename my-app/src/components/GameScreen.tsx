@@ -903,6 +903,7 @@ const GameScreen = () => {
                                             lifelinesUsed={game.lifelinesUsed}
                                             viewDetailsButtonVisible={gameIsOver}
                                             player={gamePlayer}
+                                            showStoreLink={gameIsOver}
                                         />
                                         <div style={{ width: "33.75vw" }} />
                                     </div>

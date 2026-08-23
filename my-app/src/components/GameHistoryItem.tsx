@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import "../styles/GameHistoryItem.css";
 import { GameData, Lifeline, Player, TagData, getReleaseYearString } from "./GameScreen";
+import steamLogo from "../assets/steam_logo.png";
 
 interface IGameHistoryItemProps {
     id: string;
@@ -10,9 +11,10 @@ interface IGameHistoryItemProps {
     lifelinesUsed: Lifeline[];
     viewDetailsButtonVisible: boolean;
     player: Player;
+    showStoreLink?: boolean;
 }
 
-const GameHistoryItem = ({ id, gameNumber, data, tagData, lifelinesUsed, viewDetailsButtonVisible, player }: IGameHistoryItemProps) => {
+const GameHistoryItem = ({ id, gameNumber, data, tagData, lifelinesUsed, viewDetailsButtonVisible, player, showStoreLink = false }: IGameHistoryItemProps) => {
     const [viewDetailsClicked, setViewDetailsClicked] = useState(false);
 
     return (
@@ -26,17 +28,26 @@ const GameHistoryItem = ({ id, gameNumber, data, tagData, lifelinesUsed, viewDet
                 )}
                 <div className="game-details">
                     <div className="game-title">
-                        {data.name} {getReleaseYearString(data)}
+                        {data.name} {getReleaseYearString(data)}{" "}
+                        {showStoreLink && (
+                            <a target="_blank" href={`https://store.steampowered.com/app/${id}`}>
+                                <img src={steamLogo} style={{ height: "19px", verticalAlign: "bottom", marginBottom: "2px" }} />
+                            </a>
+                        )}
                     </div>
                     {(lifelinesUsed.includes(Lifeline.RevealTags) || viewDetailsClicked || gameNumber == 1) && (
                         <div className="revealed-tags">
                             {" "}
                             {data.tag_ids.map((tag) => {
-                                return (
-                                    <div key={tag} className={"revealed-tag"}>
-                                        {tagData[tag].name}
-                                    </div>
-                                );
+                                if (Object.keys(tagData).includes(tag)) {
+                                    return (
+                                        <div key={tag} className={"revealed-tag"}>
+                                            {tagData[tag].name}
+                                        </div>
+                                    );
+                                } else {
+                                    console.log(`Messed up tag is ${tag}`);
+                                }
                             })}{" "}
                         </div>
                     )}

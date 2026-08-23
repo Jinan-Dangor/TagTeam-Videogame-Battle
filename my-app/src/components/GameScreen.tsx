@@ -22,6 +22,7 @@ import { initializePalette } from "../utilities/ColourPalette";
 
     QUALITY OF LIFE
      - Generate a "search name" for all games, made by finding and replacing accented letters with non-accented ones
+     - Fix missing tags, find out why they're there and/or remove them from database
 */
 
 // Local: "ws://localhost:8080"
@@ -498,6 +499,16 @@ const GameScreen = () => {
                 } else {
                     console.error(`A lifeline was used, but the provided lifeline type doesn't exist: ${lifelineUsed}`);
                 }
+            } else if (queryType === "end_game") {
+                setGameIsOver(true);
+                setGameResult(currentPlayerRef.current === Player.P2 ? GameResult.P1Win : GameResult.P2Win);
+                setGameHistory([
+                    ...gameHistoryRef.current.slice(0, gameHistoryRef.current.length - 1),
+                    {
+                        ...gameHistoryRef.current[gameHistoryRef.current.length - 1],
+                        lifelinesUsed: [...new Set([...gameHistoryRef.current[gameHistoryRef.current.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
+                    },
+                ]);
             } else if (queryType === "get_duel_state") {
                 const necessaryFields = [
                     "settings",
@@ -852,15 +863,9 @@ const GameScreen = () => {
                                     isCountingDown={timerActive}
                                     setIsCountingDown={setTimerActive}
                                     onTimerFinished={() => {
-                                        setGameIsOver(true);
-                                        setGameResult(currentPlayer === Player.P2 ? GameResult.P1Win : GameResult.P2Win);
-                                        setGameHistory([
-                                            ...gameHistory.slice(0, gameHistory.length - 1),
-                                            {
-                                                ...gameHistory[gameHistory.length - 1],
-                                                lifelinesUsed: [...new Set([...gameHistory[gameHistory.length - 1].lifelinesUsed, Lifeline.RevealArt, Lifeline.RevealTags])],
-                                            },
-                                        ]);
+                                        if (currentPlayer == localPlayer) {
+                                            sendApiMessage("end_game", { duelKey, playerId });
+                                        }
                                     }}
                                 />
                             </TimerContext.Provider>

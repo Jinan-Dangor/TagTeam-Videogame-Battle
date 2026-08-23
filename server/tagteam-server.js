@@ -376,6 +376,19 @@ webSocketServer.on("connection", function connection(ws) {
                 return;
             }
             ws.send(serverSuccessResponse(queryType, queryId, { ...activeDuels[duelKey] }));
+        } else if (queryType === "end_game") {
+            if (!checkForMissingParameters(ws, queryType, queryId, newRequest, ["duelKey", "playerId"])) {
+                return;
+            }
+            const duelKey = newRequest.duelKey;
+            if (!activeDuels[duelKey]) {
+                ws.send(errorResponse(queryType, queryId, `duelKey '${duelKey}' not found.`));
+                return;
+            }
+            const playerId = newRequest.playerId;
+            const index = activeDuels[duelKey].playerIds.indexOf(playerId);
+            ws.send(serverSuccessResponse(queryType, queryId, {}));
+            activePlayers[activeDuels[duelKey].playerIds[1 - index]].websocket.send(serverSuccessResponse(queryType, queryId, {}));
         } else {
             ws.send(errorResponse(queryType, queryId, `Query type '${queryType}' not recognised.`));
         }

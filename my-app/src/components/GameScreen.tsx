@@ -217,8 +217,9 @@ const GameScreen = () => {
     const latestGameAutocompleteId = useRef<string>();
     const [playerId, setPlayerId] = useState<string | null>(null);
     const [playerName, setPlayerName] = useState<string>(localStorage.getItem("localName") != null ? (localStorage.getItem("localName") as string) : DEFAULT_NAME);
+    const playerNameRef = useRef(playerName);
     useEffect(() => {
-        console.log(playerName);
+        playerNameRef.current = playerName;
     }, [playerName]);
     const [player1Name, setPlayer1Name] = useState<string>(DEFAULT_NAME);
     const [player2Name, setPlayer2Name] = useState<string>(DEFAULT_NAME);
@@ -470,13 +471,12 @@ const GameScreen = () => {
                     console.error(`Was not told which player I am`);
                     return;
                 }
-                console.log(apiMessage);
                 if (apiMessage.playerNumber == 0) {
                     setPlayer2Name(apiMessage.otherPlayerName);
-                    setPlayer1Name(playerName);
+                    setPlayer1Name(playerNameRef.current);
                 } else {
                     setPlayer1Name(apiMessage.otherPlayerName);
-                    setPlayer2Name(playerName);
+                    setPlayer2Name(playerNameRef.current);
                 }
                 setLocalPlayer(apiMessage.playerNumber == 0 ? Player.P1 : Player.P2);
                 setDuelKey(apiMessage.duelKey);
@@ -721,7 +721,6 @@ const GameScreen = () => {
                     <button
                         style={{ fontSize: "large" }}
                         onClick={() => {
-                            console.log(duelKey);
                             sendApiMessage("join_game", { playerId: playerId, playerName, duelKey: duelKey });
                         }}
                     >

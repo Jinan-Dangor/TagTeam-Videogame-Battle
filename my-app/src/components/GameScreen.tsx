@@ -407,6 +407,7 @@ const GameScreen = () => {
                         switchPlayer();
                         setTimerTimeLeft(timeLimit.current);
                         setNameSearchTerm("");
+                        setTagSearchTerm("");
                         setNewGameId("");
                     } else {
                         const currentGameName = gameHistoryRef.current[gameHistoryRef.current.length - 1].data.name;

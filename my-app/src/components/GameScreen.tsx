@@ -8,6 +8,22 @@ import TurnTimer, { TimerContext } from "./TurnTimer";
 import LifelineButtons from "./LifelineButtons";
 import { initializePalette } from "../utilities/ColourPalette";
 
+/*
+    ----FUTURE FEATURES----
+    (reminder to self)
+
+    GAMEPLAY
+     - Option: Filters for NSFW tags
+     - Option: Disallow linking via a tag to a game with that tag in the title
+     - Option: Increase turn timer
+     - Option: Landmine games which you insta-win for picking
+     - Option: Change Top 5 Tags to Top X Tags
+     - Option: (especially for Called Tags), disable overwhelming tags (singleplayer, multiplayer, etc)
+
+    QUALITY OF LIFE
+     - Generate a "search name" for all games, made by finding and replacing accented letters with non-accented ones
+*/
+
 // Local: "ws://localhost:8080"
 // Local network: "ws://192.168.0.65:8080"
 // Internet: "ws://157.211.249.178:8080"
@@ -565,7 +581,7 @@ const GameScreen = () => {
     useEffect(() => {
         if (newGameId !== "") {
             if (usedGameIds.includes(newGameId)) {
-                setErrorText(`${tagSearchTerm} has already been played.`);
+                setErrorText(`${nameSearchTerm} has already been played.`);
                 return;
             }
             sendApiMessage("make_guess", { duelKey, playerId, gameId: newGameId, selectedTag: selectedTag });
@@ -649,12 +665,14 @@ const GameScreen = () => {
                             value={playerName}
                             onChange={(e) => {
                                 const newName = e.target.value;
-                                if (newName == "") {
-                                    return;
-                                }
                                 setPlayerName(newName);
-                                console.log(`Updating local storage name to ${newName}`);
                                 localStorage.setItem("localName", newName);
+                            }}
+                            onBlur={() => {
+                                if (playerName == "") {
+                                    setPlayerName(DEFAULT_NAME);
+                                    localStorage.setItem("localName", DEFAULT_NAME);
+                                }
                             }}
                         />
                     </p>
